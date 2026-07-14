@@ -8,6 +8,26 @@ import { api } from '@/lib/api';
 import { getSentenceDuration, SPEED_OPTIONS, type SpeedOption } from '@/lib/utils';
 import type { Document } from '@/types';
 
+function isChineseText(text: string): boolean {
+  const chineseChars = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+  return chineseChars > text.replace(/[\u4e00-\u9fff]/g, '').length * 0.3;
+}
+
+function speakText(text: string, rate: number, onEnd: () => void) {
+  if (!('speechSynthesis' in window)) return null;
+
+  window.speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = rate;
+  utterance.lang = isChineseText(text) ? 'zh-CN' : 'en-US';
+  utterance.onend = onEnd;
+  utterance.onerror = () => onEnd();
+
+  window.speechSynthesis.speak(utterance);
+  return utterance;
+}
+
 export function ReaderPage() {
   const { docId } = useParams<{ docId: string }>();
   const [doc, setDoc] = useState<Document | null>(null);
@@ -17,9 +37,11 @@ export function ReaderPage() {
   const [loading, setLoading] = useState(true);
   const [fontSize, setFontSize] = useState('medium');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [ttsEnabled, setTtsEnabled] = useState(false);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -42,6 +64,7 @@ export function ReaderPage() {
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
+      window.speechSynthesis?.cancel();
     };
   }, []);
 
@@ -58,21 +81,38 @@ export function ReaderPage() {
     const currentSentence = sentences[currentIndex];
     const duration = getSentenceDuration(currentSentence?.text || '', speed);
 
-    timerRef.current = setTimeout(() => {
-      setCurrentIndex((prev) => {
-        const next = prev + 1;
-        if (next >= sentences.length) {
-          setIsPlaying(false);
-          return prev;
-        }
-        return next;
+    let ttsDuration = duration;
+
+    if (ttsEnabled && currentSentence?.text) {
+      utteranceRef.current = speakText(currentSentence.text, speed, () => {
+        setCurrentIndex((prev) => {
+          const next = prev + 1;
+          if (next >= sentences.length) {
+            setIsPlaying(false);
+            return prev;
+          }
+          return next;
+        });
       });
-    }, duration);
+    }
+
+    timerRef.current = setTimeout(() => {
+      if (!ttsEnabled) {
+        setCurrentIndex((prev) => {
+          const next = prev + 1;
+          if (next >= sentences.length) {
+            setIsPlaying(false);
+            return prev;
+          }
+          return next;
+        });
+      }
+    }, ttsDuration);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [isPlaying, currentIndex, speed, doc]);
+  }, [isPlaying, currentIndex, speed, doc, ttsEnabled]);
 
   const saveProgress = useCallback(async () => {
     if (!docId) return;
@@ -86,15 +126,20 @@ export function ReaderPage() {
   }, [saveProgress]);
 
   const handleBack = () => {
+    window.speechSynthesis?.cancel();
     saveProgress();
     navigate(-1);
   };
 
   const handlePlayPause = () => {
+    if (isPlaying) {
+      window.speechSynthesis?.cancel();
+    }
     setIsPlaying(!isPlaying);
   };
 
   const handleNext = () => {
+    window.speechSynthesis?.cancel();
     const sentences = ((doc?.sentences as unknown[]) || []) as { text: string }[];
     if (currentIndex < sentences.length - 1) {
       setCurrentIndex((prev) => prev + 1);
@@ -103,6 +148,7 @@ export function ReaderPage() {
   };
 
   const handlePrev = () => {
+    window.speechSynthesis?.cancel();
     if (currentIndex > 0) {
       setCurrentIndex((prev) => prev - 1);
       setIsPlaying(false);
@@ -110,6 +156,7 @@ export function ReaderPage() {
   };
 
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    window.speechSynthesis?.cancel();
     if (!doc) return;
     const sentences = ((doc.sentences as unknown[]) || []) as { text: string }[];
     const rect = e.currentTarget.getBoundingClientRect();
@@ -258,13 +305,40 @@ export function ReaderPage() {
           </button>
         </div>
 
-        <div className="flex items-center justify-center mt-4">
+        <div className="flex items-center justify-center gap-3 mt-4">
           <button
             onClick={() => setShowSpeedMenu(true)}
             className="text-xs font-medium px-3 py-1.5 rounded-full bg-surface-card text-text-muted hover:text-text transition-colors"
           >
             {speed}x
           </button>
+
+          {'speechSynthesis' in window && (
+            <button
+              onClick={() => setTtsEnabled(!ttsEnabled)}
+              className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
+                ttsEnabled
+                  ? 'bg-primary text-white'
+                  : 'bg-surface-card text-text-muted hover:text-text'
+              }`}
+            >
+              <span className="flex items-center gap-1">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                  {ttsEnabled && (
+                    <>
+                      <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                    </>
+                  )}
+                  {!ttsEnabled && (
+                    <line x1="23" y1="9" x2="17" y2="15" />
+                  )}
+                </svg>
+                朗读
+              </span>
+            </button>
+          )}
         </div>
       </div>
 

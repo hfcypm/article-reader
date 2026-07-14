@@ -9,6 +9,29 @@ import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import type { Document } from '@/types';
 
+const STAT_CONFIG = [
+  { key: 'format', label: '格式', icon: 'file', color: 'text-violet-500', bg: 'bg-violet-50' },
+  { key: 'wordCount', label: '字数', icon: 'text', color: 'text-sky-500', bg: 'bg-sky-50' },
+  { key: 'sentenceCount', label: '句数', icon: 'list', color: 'text-emerald-500', bg: 'bg-emerald-50' },
+  { key: 'importedAt', label: '导入时间', icon: 'clock', color: 'text-amber-500', bg: 'bg-amber-50' },
+] as const;
+
+function StatIcon({ name }: { name: string }) {
+  const cls = 'w-4 h-4';
+  switch (name) {
+    case 'file':
+      return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>;
+    case 'text':
+      return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>;
+    case 'list':
+      return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>;
+    case 'clock':
+      return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+    default:
+      return null;
+  }
+}
+
 export function DetailPage() {
   const { docId } = useParams<{ docId: string }>();
   const [doc, setDoc] = useState<Document | null>(null);
@@ -17,6 +40,7 @@ export function DetailPage() {
   const [showPrompt, setShowPrompt] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [showEdit, setShowEdit] = useState(false);
+  const [previewExpanded, setPreviewExpanded] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -64,103 +88,195 @@ export function DetailPage() {
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center bg-surface">
-        <span className="text-text-muted text-sm">加载中...</span>
+      <div className="h-full flex flex-col bg-surface">
+        <Header title="加载中..." showBack />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-5 fade-in">
+            <div className="relative">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 animate-pulse" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <svg className="animate-spin w-8 h-8 text-primary/30" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeDashoffset="8" />
+                </svg>
+              </div>
+            </div>
+            <p className="text-sm text-text-muted">加载文档信息...</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!doc) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-surface gap-4">
-        <p className="text-text-muted">文档不存在</p>
-        <Button onClick={() => navigate('/')}>返回首页</Button>
+      <div className="h-full flex flex-col bg-surface">
+        <Header title="文档详情" showBack />
+        <div className="flex-1 flex flex-col items-center justify-center gap-5 px-6">
+          <div className="w-20 h-20 rounded-full bg-surface-card flex items-center justify-center">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+          <p className="text-text font-medium">文档不存在</p>
+          <p className="text-text-muted text-sm -mt-3">该文档可能已被删除</p>
+          <Button onClick={() => navigate('/')} className="mt-2">返回首页</Button>
+        </div>
       </div>
     );
   }
 
+  const statValues: Record<string, string> = {
+    format: doc.format.toUpperCase(),
+    wordCount: doc.wordCount.toLocaleString(),
+    sentenceCount: String(sentences.length),
+    importedAt: formatDate(doc.importedAt),
+  };
+
+  const previewSentences = previewExpanded ? sentences : sentences.slice(0, 20);
+  const hasMore = sentences.length > 20;
+
   return (
     <div className="h-full flex flex-col bg-surface">
       <Header
-        title={doc.title}
+        title=""
         showBack
         action={
-          <Button variant="ghost" size="sm" onClick={() => setShowEdit(true)} className="!text-xs">
-            编辑
+          <Button variant="ghost" size="sm" onClick={() => setShowEdit(true)} className="!w-9 !h-9 !p-0 !rounded-full">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
           </Button>
         }
       />
 
       <div className="flex-1 overflow-y-auto">
-        <Card className="mx-4 mt-4">
-          <div className="grid grid-cols-2 gap-3 text-left">
-            <div>
-              <p className="text-xs text-text-muted">格式</p>
-              <p className="text-sm font-medium text-text">{doc.format.toUpperCase()}</p>
+        <div className="relative px-5 pt-6 pb-4">
+          <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-primary/6 to-transparent pointer-events-none" />
+
+          <div className="relative flex items-start gap-4 mb-6">
+            <div className="w-16 h-16 rounded-2xl bg-white shadow-lg shadow-black/5 flex items-center justify-center flex-shrink-0 ring-1 ring-black/5">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                <line x1="8" y1="7" x2="16" y2="7"/>
+                <line x1="8" y1="11" x2="14" y2="11"/>
+              </svg>
             </div>
-            <div>
-              <p className="text-xs text-text-muted">字数</p>
-              <p className="text-sm font-medium text-text">{doc.wordCount.toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-xs text-text-muted">句数</p>
-              <p className="text-sm font-medium text-text">{sentences.length}</p>
-            </div>
-            <div>
-              <p className="text-xs text-text-muted">导入时间</p>
-              <p className="text-sm font-medium text-text">{formatDate(doc.importedAt)}</p>
+            <div className="flex-1 min-w-0 pt-1">
+              <h1 className="text-xl font-bold text-text leading-tight line-clamp-2">{doc.title}</h1>
+              <div className="flex items-center gap-2 mt-1.5">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[11px] font-medium">
+                  {doc.format.toUpperCase()}
+                </span>
+                {inBookshelf && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600 text-[11px] font-medium">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    已加入书架
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-        </Card>
 
-        <div className="px-4 mt-4 mb-4">
-          <h3 className="text-sm font-semibold text-text mb-2">正文预览</h3>
-          <div className="rounded-xl bg-surface-card border border-border/50 p-4 max-h-60 overflow-y-auto">
-            <p className="text-sm text-text leading-relaxed whitespace-pre-wrap">
-              {sentences.slice(0, 20).map((s) => s.text).join('')}
-              {sentences.length > 20 && (
-                <span className="text-text-muted">...</span>
+          <div className="grid grid-cols-2 gap-2.5 mb-6">
+            {STAT_CONFIG.map(({ key, label, icon, color, bg }) => (
+              <div key={key} className={`${bg} rounded-xl p-3 flex items-center gap-3`}>
+                <div className={`w-9 h-9 rounded-lg bg-white/70 flex items-center justify-center ${color}`}>
+                  <StatIcon name={icon} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-text-muted uppercase tracking-wider">{label}</p>
+                  <p className="text-sm font-semibold text-text truncate">{statValues[key]}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-1 h-4 rounded-full bg-primary" />
+              <h2 className="text-sm font-semibold text-text">正文预览</h2>
+            </div>
+            <div className="relative rounded-2xl bg-surface-card border border-border/40 overflow-hidden">
+              <div className={`p-4 overflow-y-auto ${previewExpanded ? 'max-h-96' : 'max-h-52'}`}>
+                <p className="text-sm text-text/80 leading-7 whitespace-pre-wrap selection:bg-primary/20">
+                  {previewSentences.map((s) => s.text).join('')}
+                  {hasMore && !previewExpanded && (
+                    <span className="text-text-muted/40 select-none">...</span>
+                  )}
+                </p>
+              </div>
+              {!previewExpanded && hasMore && (
+                <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-surface-card to-transparent pointer-events-none" />
               )}
-            </p>
+            </div>
+            {hasMore && (
+              <button
+                onClick={() => setPreviewExpanded(!previewExpanded)}
+                className="w-full mt-2 py-2 text-xs text-primary font-medium hover:bg-primary/5 rounded-xl transition-colors"
+              >
+                {previewExpanded ? '收起预览' : `展开全部（共 ${sentences.length} 句）`}
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="p-4 border-t border-border bg-surface">
-        <div className="flex gap-3">
-          {inBookshelf ? (
-            <>
-              <Button variant="secondary" className="flex-1" onClick={() => navigate(`/reader/${docId}`)}>
-                继续阅读
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="secondary" className="flex-1" onClick={handleAddToBookshelf}>
-                加入书架
-              </Button>
-              <Button className="flex-1" onClick={() => navigate(`/reader/${docId}`)}>
-                开始阅读
-              </Button>
-            </>
-          )}
-        </div>
+      <div className="p-4 border-t border-border/60 bg-surface/95 backdrop-blur-sm">
+        {inBookshelf ? (
+          <Button className="w-full h-12 text-sm shadow-lg shadow-primary/20" onClick={() => navigate(`/reader/${docId}`)}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            继续阅读
+          </Button>
+        ) : (
+          <div className="flex gap-3">
+            <Button variant="secondary" className="flex-1 h-12 text-sm" onClick={handleAddToBookshelf}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+              </svg>
+              加入书架
+            </Button>
+            <Button className="flex-1 h-12 text-sm shadow-lg shadow-primary/20" onClick={() => navigate(`/reader/${docId}`)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="5 3 19 12 5 21 5 3"/>
+              </svg>
+              开始阅读
+            </Button>
+          </div>
+        )}
       </div>
 
       <Dialog
         open={showPrompt && !inBookshelf}
         onClose={() => setShowPrompt(false)}
-        title="是否加入书架？"
+        title="加入书架"
       >
-        <p className="text-sm text-text-muted mb-6">加入书架后可记录阅读进度，方便下次续读。</p>
+        <div className="text-center py-2">
+          <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+          </div>
+          <p className="text-sm text-text-muted mb-5">加入书架后可记录阅读进度，<br/>下次继续阅读时无需从头开始。</p>
+        </div>
         <div className="space-y-2">
-          <Button className="w-full" onClick={handleAddToBookshelf}>
+          <Button className="w-full h-11" onClick={handleAddToBookshelf}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
             加入书架
           </Button>
-          <Button variant="secondary" className="w-full" onClick={() => { setShowPrompt(false); navigate(`/reader/${docId}`); }}>
-            立即阅读
+          <Button variant="secondary" className="w-full h-11" onClick={() => { setShowPrompt(false); navigate(`/reader/${docId}`); }}>
+            直接阅读
           </Button>
-          <Button variant="ghost" className="w-full" onClick={() => setShowPrompt(false)}>
+          <Button variant="ghost" className="w-full h-11" onClick={() => setShowPrompt(false)}>
             暂不加入
           </Button>
         </div>
@@ -171,17 +287,24 @@ export function DetailPage() {
         onClose={() => setShowEdit(false)}
         title="编辑书名"
       >
-        <div className="mb-4">
+        <div className="mb-5">
+          <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </div>
           <input
-            className="w-full h-11 px-4 rounded-xl border-2 border-border text-sm text-text focus:outline-none focus:border-primary bg-surface"
+            className="w-full h-12 px-4 rounded-xl border-2 border-border bg-surface text-sm text-text placeholder:text-text-muted/50 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all"
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
             placeholder="输入新书名"
+            autoFocus
           />
         </div>
         <div className="flex gap-2">
-          <Button variant="ghost" className="flex-1" onClick={() => setShowEdit(false)}>取消</Button>
-          <Button className="flex-1" onClick={handleUpdateTitle}>保存</Button>
+          <Button variant="ghost" className="flex-1 h-11" onClick={() => setShowEdit(false)}>取消</Button>
+          <Button className="flex-1 h-11" onClick={handleUpdateTitle}>保存</Button>
         </div>
       </Dialog>
     </div>
