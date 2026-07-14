@@ -62,7 +62,7 @@ export function TabBar() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-lg border-t border-border">
-      <div className="max-w-[480px] mx-auto flex items-center justify-around h-16 px-4">
+      <div className="w-full mx-auto flex items-center justify-around h-16 px-4">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.key;
           return (

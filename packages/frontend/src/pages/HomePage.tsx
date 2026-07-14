@@ -113,7 +113,12 @@ export function HomePage() {
 
   return (
     <div className="page">
-      <div className="p-4 pt-6 fade-in">
+      <div className="flex flex-col p-4 pt-6 fade-in">
+        <div className="w-1/2 h-80 bg-accent-green p-10">
+          <span className="block mt-10 mx-10 text-sm text-text-muted">hello123</span>
+        </div>
+
+
         <h1 className="text-xl font-bold text-text mb-6">文章阅读</h1>
 
         <input
@@ -126,7 +131,9 @@ export function HomePage() {
 
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="w-full h-32 rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 flex flex-col items-center justify-center gap-3 mb-8 hover:bg-primary/10 hover:border-primary/50 transition-all duration-200"
+          className="w-full h-32 rounded-2xl border-2 border-dashed border-primary/30
+           bg-primary/5 flex flex-col items-center justify-center gap-3 mb-8
+            hover:bg-primary/10 hover:border-primary/50 transition-all duration-200"
         >
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -220,9 +227,9 @@ export function HomePage() {
         closable={!isImporting}
         title={
           importState.status === 'checking' ? '正在检查...' :
-          importState.status === 'parsing' ? '正在解析...' :
-          importState.status === 'success' ? '导入完成' :
-          '导入失败'
+            importState.status === 'parsing' ? '正在解析...' :
+              importState.status === 'success' ? '导入完成' :
+                '导入失败'
         }
       >
         {isImporting && (
