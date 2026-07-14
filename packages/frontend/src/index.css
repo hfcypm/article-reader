@@ -1,0 +1,141 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #6c5ce7;
+  --color-primary-light: #a29bfe;
+  --color-primary-dark: #5a4bd1;
+  --color-surface: #ffffff;
+  --color-surface-dark: #1a1a2e;
+  --color-surface-card: #f8f9fa;
+  --color-surface-card-dark: #16213e;
+  --color-text: #2d3436;
+  --color-text-dark: #e2e8f0;
+  --color-text-muted: #636e72;
+  --color-text-muted-dark: #94a3b8;
+  --color-border: #e2e8f0;
+  --color-border-dark: #334155;
+  --color-accent-green: #00b894;
+  --color-accent-orange: #fdcb6e;
+  --color-accent-red: #ff7675;
+  --color-accent-blue: #74b9ff;
+}
+
+:root {
+  --color-bg: var(--color-surface);
+  --color-fg: var(--color-text);
+}
+
+.dark {
+  --color-bg: var(--color-surface-dark);
+  --color-fg: var(--color-text-dark);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial,
+    sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  max-width: 480px;
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  #root {
+    border-left: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.08);
+  }
+}
+
+.page {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 72px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.page::-webkit-scrollbar {
+  width: 0;
+}
+
+.slide-in-right {
+  animation: slideInRight 0.25s ease-out;
+}
+
+.slide-in-left {
+  animation: slideInLeft 0.25s ease-out;
+}
+
+.slide-out-right {
+  animation: slideOutRight 0.25s ease-out;
+}
+
+.slide-out-left {
+  animation: slideOutLeft 0.25s ease-out;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideOutRight {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+
+@keyframes slideOutLeft {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(-100%); opacity: 0; }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.reader-sentence {
+  transition: all 0.3s ease;
+}
+
+.reader-sentence.active {
+  transform: scale(1.02);
+}
+
+.book-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.book-card:active {
+  transform: scale(0.98);
+}

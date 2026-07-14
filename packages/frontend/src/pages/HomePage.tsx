@@ -1,0 +1,301 @@
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Dialog } from '@/components/ui/dialog';
+import { showToast } from '@/components/ui/toast';
+import { api } from '@/lib/api';
+import { formatDate } from '@/lib/utils';
+import type { DocumentSummary, BookshelfItem } from '@/types';
+
+type ImportState = {
+  status: 'idle' | 'checking' | 'parsing' | 'success' | 'error';
+  fileName: string;
+  docId?: string;
+  errorMsg?: string;
+  title?: string;
+  format?: string;
+  wordCount?: number;
+  sentenceCount?: number;
+};
+
+export function HomePage() {
+  const [recentImports, setRecentImports] = useState<DocumentSummary[]>([]);
+  const [continueReading, setContinueReading] = useState<BookshelfItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [importState, setImportState] = useState<ImportState>({ status: 'idle', fileName: '' });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    const [recentRes, continueRes] = await Promise.all([
+      api.get<DocumentSummary[]>('/documents/recent'),
+      api.get<BookshelfItem[]>('/bookshelf/continue-reading'),
+    ]);
+    if (recentRes.success && recentRes.data) setRecentImports(recentRes.data);
+    if (continueRes.success && continueRes.data) setContinueReading(continueRes.data);
+    setLoading(false);
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const fileName = file.name;
+    const ext = fileName.split('.').pop()?.toLowerCase() || '';
+
+    if (!['txt', 'mobi', 'pdf'].includes(ext)) {
+      showToast('仅支持 TXT、MOBI、PDF 格式', 'error');
+      e.target.value = '';
+      return;
+    }
+
+    if (file.size > 50 * 1024 * 1024) {
+      showToast('文件大小超过 50MB 限制', 'error');
+      e.target.value = '';
+      return;
+    }
+
+    setImportState({ status: 'checking', fileName });
+
+    const dup = await api.post<{ exists: boolean }>('/documents/check-duplicate', { fileName });
+    if (dup.data?.exists) {
+      setImportState({ status: 'error', fileName, errorMsg: '该文件已导入' });
+      e.target.value = '';
+      return;
+    }
+
+    setImportState({ status: 'parsing', fileName });
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await api.post<DocumentSummary & { sentenceCount: number; format: string }>('/documents/import', formData);
+      if (res.success && res.data) {
+        setImportState({
+          status: 'success',
+          fileName,
+          docId: res.data.id,
+          title: res.data.title || fileName.replace(/\.[^.]+$/, ''),
+          format: res.data.format || ext,
+          wordCount: res.data.wordCount,
+          sentenceCount: (res.data as { sentenceCount: number }).sentenceCount || 0,
+        });
+      } else {
+        setImportState({ status: 'error', fileName, errorMsg: res.error || '导入失败' });
+      }
+    } catch {
+      setImportState({ status: 'error', fileName, errorMsg: '解析失败，请重试' });
+    }
+    e.target.value = '';
+  };
+
+  const handleCloseImportDialog = () => {
+    if (importState.status === 'success' && importState.docId) {
+      navigate(`/detail/${importState.docId}`);
+    }
+    setImportState({ status: 'idle', fileName: '' });
+  };
+
+  useEffect(() => {
+    if (importState.status === 'success' || importState.status === 'error') return;
+  }, [importState.status]);
+
+  const isImporting = importState.status === 'checking' || importState.status === 'parsing';
+
+  return (
+    <div className="page">
+      <div className="p-4 pt-6 fade-in">
+        <h1 className="text-xl font-bold text-text mb-6">文章阅读</h1>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".txt,.mobi,.pdf"
+          className="hidden"
+          onChange={handleImport}
+        />
+
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full h-32 rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 flex flex-col items-center justify-center gap-3 mb-8 hover:bg-primary/10 hover:border-primary/50 transition-all duration-200"
+        >
+          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+          </div>
+          <span className="text-sm font-medium text-primary">导入本地文档</span>
+          <span className="text-xs text-text-muted">支持 TXT / MOBI / PDF 格式，最大 50MB</span>
+        </button>
+
+        {continueReading.length > 0 && (
+          <section className="mb-6">
+            <h2 className="text-base font-semibold text-text mb-3">继续阅读</h2>
+            <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
+              {continueReading.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => navigate(`/reader/${item.docId}`)}
+                  className="flex-shrink-0 w-36 snap-start"
+                >
+                  <Card className="h-full book-card flex flex-col gap-2 text-left">
+                    <div className="flex-1">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-2">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                        </svg>
+                      </div>
+                      <p className="text-sm font-medium text-text line-clamp-2">{item.title}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="flex-1 h-1 bg-border rounded-full overflow-hidden">
+                        <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${Math.round(item.progress * 100)}%` }} />
+                      </div>
+                      <span className="text-[10px] text-text-muted">{Math.round(item.progress * 100)}%</span>
+                    </div>
+                  </Card>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section>
+          <h2 className="text-base font-semibold text-text mb-3">最近导入</h2>
+          {loading ? (
+            <div className="text-center py-8 text-text-muted text-sm">加载中...</div>
+          ) : recentImports.length === 0 ? (
+            <EmptyState
+              title="尚无导入记录"
+              description="点击上方按钮导入你的第一篇文档"
+            />
+          ) : (
+            <div className="space-y-2">
+              {recentImports.map((doc) => (
+                <button
+                  key={doc.id}
+                  onClick={() => navigate(`/detail/${doc.id}`)}
+                  className="w-full"
+                >
+                  <Card className="flex items-center gap-3 book-card">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" y1="13" x2="8" y2="13" />
+                        <line x1="16" y1="17" x2="8" y2="17" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <p className="text-sm font-medium text-text truncate">{doc.title}</p>
+                      <p className="text-xs text-text-muted">{formatDate(doc.importedAt)}</p>
+                    </div>
+                    <Badge variant="default">{doc.format.toUpperCase()}</Badge>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </Card>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+
+      <Dialog
+        open={importState.status !== 'idle'}
+        onClose={handleCloseImportDialog}
+        closable={!isImporting}
+        title={
+          importState.status === 'checking' ? '正在检查...' :
+          importState.status === 'parsing' ? '正在解析...' :
+          importState.status === 'success' ? '导入完成' :
+          '导入失败'
+        }
+      >
+        {isImporting && (
+          <div className="flex flex-col items-center py-4">
+            <div className="relative w-16 h-16 mb-4">
+              <svg className="animate-spin w-16 h-16 text-primary/20" viewBox="0 0 64 64" fill="none">
+                <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="4" />
+                <path d="M32 4a28 28 0 0 1 28 28" stroke="var(--color-primary)" strokeWidth="4" strokeLinecap="round" />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+              </div>
+            </div>
+            <p className="text-sm text-text-muted mb-1">
+              {importState.status === 'checking' ? '检查文件是否已导入...' : '识别文字内容中...'}
+            </p>
+            <p className="text-xs text-text-muted/60 truncate max-w-full px-4">{importState.fileName}</p>
+          </div>
+        )}
+
+        {importState.status === 'success' && (
+          <div className="flex flex-col items-center py-2">
+            <div className="w-14 h-14 rounded-full bg-accent-green/10 flex items-center justify-center mb-4">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-green)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+            <p className="text-sm font-medium text-text mb-3 text-center truncate max-w-full px-2">{importState.title}</p>
+            <div className="grid grid-cols-3 gap-3 w-full mb-4">
+              <div className="bg-surface-card rounded-xl py-2 text-center">
+                <p className="text-lg font-bold text-primary">{importState.format?.toUpperCase() || '-'}</p>
+                <p className="text-[10px] text-text-muted">格式</p>
+              </div>
+              <div className="bg-surface-card rounded-xl py-2 text-center">
+                <p className="text-lg font-bold text-text">{(importState.wordCount || 0).toLocaleString()}</p>
+                <p className="text-[10px] text-text-muted">字数</p>
+              </div>
+              <div className="bg-surface-card rounded-xl py-2 text-center">
+                <p className="text-lg font-bold text-accent-green">{importState.sentenceCount || 0}</p>
+                <p className="text-[10px] text-text-muted">句子</p>
+              </div>
+            </div>
+            <Button className="w-full" onClick={handleCloseImportDialog}>
+              查看详情
+            </Button>
+          </div>
+        )}
+
+        {importState.status === 'error' && (
+          <div className="flex flex-col items-center py-2">
+            <div className="w-14 h-14 rounded-full bg-accent-red/10 flex items-center justify-center mb-4">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-red)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="15" y1="9" x2="9" y2="15" />
+                <line x1="9" y1="9" x2="15" y2="15" />
+              </svg>
+            </div>
+            <p className="text-sm font-medium text-text mb-1">导入失败</p>
+            <p className="text-xs text-text-muted mb-4">{importState.errorMsg}</p>
+            <div className="flex gap-2 w-full">
+              <Button variant="secondary" className="flex-1" onClick={handleCloseImportDialog}>
+                关闭
+              </Button>
+              <Button className="flex-1" onClick={() => { setImportState({ status: 'idle', fileName: '' }); fileInputRef.current?.click(); }}>
+                重新选择
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
+    </div>
+  );
+}

@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String          @id @default(cuid())
+  phone         String          @unique
+  nickname      String
+  passwordHash  String          @map("password_hash")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  bookshelfItems BookshelfItem[]
+  documents     Document[]
+  settings      UserSettings?
+
+  @@map("users")
+}
+
+model Document {
+  id         String         @id @default(cuid())
+  userId     String         @map("user_id")
+  title      String
+  format     String
+  wordCount  Int            @map("word_count")
+  sentences  String         @default("[]")
+  content    String         @default("")
+  importedAt DateTime       @default(now()) @map("imported_at")
+  createdAt  DateTime       @default(now()) @map("created_at")
+  updatedAt  DateTime       @updatedAt @map("updated_at")
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookshelfItems BookshelfItem[]
+
+  @@map("documents")
+}
+
+model BookshelfItem {
+  id             String   @id @default(cuid())
+  userId         String   @map("user_id")
+  docId          String   @map("doc_id")
+  currentSentence Int     @default(0) @map("current_sentence")
+  progress       Float    @default(0)
+  addedAt        DateTime @default(now()) @map("added_at")
+  lastReadAt     DateTime @default(now()) @map("last_read_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document       Document @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, docId])
+  @@map("bookshelf_items")
+}
+
+model UserSettings {
+  id            String   @id @default(cuid())
+  userId        String   @unique @map("user_id")
+  defaultSpeed  Float    @default(1.0) @map("default_speed")
+  fontSize      String   @default("medium") @map("font_size")
+  theme         String   @default("light")
+  ttsEnabled    Boolean  @default(false) @map("tts_enabled")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
