@@ -3,6 +3,69 @@ import { splitSentences, countWords, detectEncoding, parseTextContent, extractPd
 
 const prisma = new PrismaClient();
 
+async function processDocument(docId: string, buffer: ArrayBuffer, ext: string, title: string) {
+  try {
+    await prisma.document.update({
+      where: { id: docId },
+      data: { progress: 10 },
+    });
+
+    let text: string;
+    if (ext === 'pdf') {
+      text = await extractPdfText(buffer);
+    } else if (ext === 'mobi') {
+      text = extractMobiText(buffer);
+    } else {
+      const encoding = detectEncoding(buffer);
+      text = parseTextContent(buffer, encoding);
+    }
+
+    await prisma.document.update({
+      where: { id: docId },
+      data: { progress: 30 },
+    });
+
+    if (text.trim().length === 0) {
+      await prisma.document.update({
+        where: { id: docId },
+        data: { status: 'failed', progress: 0 },
+      });
+      return;
+    }
+
+    const sentences = splitSentences(text);
+    await prisma.document.update({
+      where: { id: docId },
+      data: { progress: 60 },
+    });
+
+    const wordCount = countWords(text);
+
+    await prisma.document.update({
+      where: { id: docId },
+      data: { progress: 80 },
+    });
+
+    await prisma.document.update({
+      where: { id: docId },
+      data: {
+        title,
+        format: ext,
+        wordCount,
+        sentences: JSON.stringify(sentences),
+        content: text,
+        status: 'completed',
+        progress: 100,
+      },
+    });
+  } catch (e) {
+    await prisma.document.update({
+      where: { id: docId },
+      data: { status: 'failed', progress: 0 },
+    });
+  }
+}
+
 export class DocumentService {
   async importDocument(userId: string, file: File) {
     const allowedFormats = ['txt', 'mobi', 'pdf'];
@@ -17,41 +80,33 @@ export class DocumentService {
       throw new Error('文件大小超过 50MB 限制');
     }
 
-    const buffer = await file.arrayBuffer();
-    let text: string;
-
-    if (ext === 'pdf') {
-      text = await extractPdfText(buffer);
-    } else if (ext === 'mobi') {
-      text = extractMobiText(buffer);
-    } else {
-      const encoding = detectEncoding(buffer);
-      text = parseTextContent(buffer, encoding);
-    }
-
-    if (text.trim().length === 0) {
-      throw new Error('文件内容为空或无法识别');
-    }
-
     const title = fileName.replace(/\.[^.]+$/, '');
-    const sentences = splitSentences(text);
-    const wordCount = countWords(text);
+    const buffer = await file.arrayBuffer();
 
     const document = await prisma.document.create({
       data: {
         userId,
         title,
         format: ext,
-        wordCount,
-        sentences: JSON.stringify(sentences),
-        content: text,
+        status: 'processing',
+        progress: 0,
       },
     });
 
+    processDocument(document.id, buffer, ext, title);
+
+    return document;
+  }
+
+  async getProgress(userId: string, docId: string) {
+    const doc = await prisma.document.findFirst({
+      where: { id: docId, userId },
+      select: { id: true, status: true, progress: true, title: true, format: true, wordCount: true, sentences: true },
+    });
+    if (!doc) throw new Error('文档不存在');
     return {
-      ...document,
-      sentences: JSON.parse(document.sentences),
-      sentenceCount: sentences.length,
+      ...doc,
+      sentenceCount: doc.status === 'completed' ? JSON.parse(doc.sentences).length : 0,
     };
   }
 

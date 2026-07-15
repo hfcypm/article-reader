@@ -32,20 +32,22 @@ export function RegisterPage() {
 
   return (
     <div className="h-full flex flex-col bg-surface">
-      <div className="flex-1 flex flex-col items-center justify-center px-6">
+      <div className="flex-1 flex flex-col items-center justify-center px-8 py-8">
         <div className="w-full max-w-sm fade-in">
           <div className="text-center mb-10">
-            <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary/30">
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-              </svg>
+            <div className="flex justify-center mb-6">
+              <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                  <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                </svg>
+              </div>
             </div>
             <h1 className="text-2xl font-bold text-text mb-1">创建账号</h1>
             <p className="text-sm text-text-muted">开始你的阅读之旅</p>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-6">
             <Input
               label="昵称"
               placeholder="请输入昵称"

@@ -23,17 +23,27 @@
 :root {
   --color-bg: var(--color-surface);
   --color-fg: var(--color-text);
+  --card-bg: var(--color-surface-card);
+  --card-border: var(--color-border);
+  --muted-fg: var(--color-text-muted);
+  --body-bg: var(--color-surface);
 }
 
 .dark {
   --color-bg: var(--color-surface-dark);
   --color-fg: var(--color-text-dark);
+  --card-bg: var(--color-surface-card-dark);
+  --card-border: var(--color-border-dark);
+  --muted-fg: var(--color-text-muted-dark);
+  --body-bg: var(--color-surface-dark);
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
 }
 
 html,
@@ -74,10 +84,7 @@ body {
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-top: 1rem;
-  padding-left: 15px;
-  padding-right: 15px;
-  padding-bottom: 72px;
+  padding: 0 20px 88px;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -179,4 +186,14 @@ body {
 
 .book-card:active {
   transform: scale(0.98);
+}
+
+@keyframes indeterminate {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(150%); }
+  100% { transform: translateX(350%); }
+}
+
+.animate-indeterminate {
+  animation: indeterminate 2s ease-in-out infinite;
 }

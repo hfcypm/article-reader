@@ -1,11 +1,12 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/store/authStore';
+import { t } from '@/lib/i18n';
 import type { TabPage } from '@/types';
 
-const tabs: { key: TabPage; label: string; icon: string; path: string }[] = [
-  { key: 'home', label: 'HOME', icon: 'home', path: '/' },
-  { key: 'bookshelf', label: '书架', icon: 'bookshelf', path: '/bookshelf' },
-  { key: 'profile', label: '我的', icon: 'profile', path: '/profile' },
+const tabs: { key: TabPage; labelKey: string; icon: string; path: string }[] = [
+  { key: 'home', labelKey: 'home.title', icon: 'home', path: '/' },
+  { key: 'bookshelf', labelKey: 'bookshelf', icon: 'bookshelf', path: '/bookshelf' },
+  { key: 'profile', labelKey: 'profile', icon: 'profile', path: '/profile' },
 ];
 
 function TabIcon({ name, active }: { name: string; active: boolean }) {
@@ -74,7 +75,7 @@ export function TabBar() {
               }`}
             >
               <TabIcon name={tab.icon} active={isActive} />
-              <span className="text-[10px] font-medium">{tab.label}</span>
+              <span className="text-[10px] font-medium">{t(tab.labelKey)}</span>
             </button>
           );
         })}

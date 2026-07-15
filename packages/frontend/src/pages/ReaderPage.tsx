@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { showToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { getSentenceDuration, SPEED_OPTIONS, type SpeedOption } from '@/lib/utils';
+import { useSettingsStore, type FontSize, type Theme } from '@/store/settingsStore';
 import type { Document } from '@/types';
 
 function isChineseText(text: string): boolean {
@@ -30,19 +31,25 @@ function speakText(text: string, rate: number, onEnd: () => void) {
 
 export function ReaderPage() {
   const { docId } = useParams<{ docId: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const settings = useSettingsStore();
   const [doc, setDoc] = useState<Document | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [speed, setSpeed] = useState<SpeedOption>(1.0);
+  const [speed, setSpeed] = useState<SpeedOption>(
+    (location.state as { speed?: SpeedOption })?.speed || settings.defaultSpeed
+  );
   const [loading, setLoading] = useState(true);
-  const [fontSize, setFontSize] = useState('medium');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [ttsEnabled, setTtsEnabled] = useState(false);
+  const [fontSize, setFontSize] = useState(settings.fontSize);
+  const [theme, setTheme] = useState<Theme>(settings.theme);
+  const [ttsEnabled, setTtsEnabled] = useState(settings.ttsEnabled);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const navigate = useNavigate();
+  const progressBarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (docId) loadDocument(docId);
@@ -155,6 +162,48 @@ export function ReaderPage() {
     }
   };
 
+  const seekToPosition = useCallback((clientX: number) => {
+    if (!doc) return;
+    const sentences = ((doc.sentences as unknown[]) || []) as { text: string }[];
+    const bar = progressBarRef.current;
+    if (!bar) return;
+    const rect = bar.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const targetIndex = Math.floor(ratio * (sentences.length - 1));
+    setCurrentIndex(targetIndex);
+    setIsPlaying(false);
+  }, [doc]);
+
+  const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    window.speechSynthesis?.cancel();
+    setIsDragging(true);
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    seekToPosition(clientX);
+  }, [seekToPosition]);
+
+  const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
+    const clientX = 'touches' in e ? (e as TouchEvent).touches[0].clientX : (e as MouseEvent).clientX;
+    seekToPosition(clientX);
+  }, [seekToPosition]);
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isDragging) return;
+    document.addEventListener('mousemove', handleDragMove);
+    document.addEventListener('mouseup', handleDragEnd);
+    document.addEventListener('touchmove', handleDragMove, { passive: true });
+    document.addEventListener('touchend', handleDragEnd);
+    return () => {
+      document.removeEventListener('mousemove', handleDragMove);
+      document.removeEventListener('mouseup', handleDragEnd);
+      document.removeEventListener('touchmove', handleDragMove);
+      document.removeEventListener('touchend', handleDragEnd);
+    };
+  }, [isDragging, handleDragMove, handleDragEnd]);
+
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
     window.speechSynthesis?.cancel();
     if (!doc) return;
@@ -166,7 +215,7 @@ export function ReaderPage() {
     setIsPlaying(false);
   };
 
-  const fontSizes: Record<string, string> = {
+  const fontSizes: Record<FontSize, string> = {
     small: 'text-xl leading-relaxed',
     medium: 'text-2xl leading-relaxed',
     large: 'text-3xl leading-relaxed',
@@ -214,10 +263,10 @@ export function ReaderPage() {
         }
       />
 
-      <div className="flex-1 flex flex-col items-center justify-center px-6 overflow-hidden">
+      <div className="flex-1 flex flex-col items-center justify-center px-8 overflow-hidden">
         <div className="flex-1 flex flex-col items-center justify-center w-full max-h-full">
           {currentIndex > 0 && (
-            <div className="mb-6 w-full text-center">
+            <div className="mb-8 w-full text-center">
               <p className="text-sm text-text-muted/60 line-clamp-2">
                 {sentences[currentIndex - 1]?.text || ''}
               </p>
@@ -233,7 +282,7 @@ export function ReaderPage() {
           </div>
 
           {currentIndex < sentences.length - 1 && (
-            <div className="mt-6 w-full text-center">
+            <div className="mt-8 w-full text-center">
               <p className="text-sm text-text-muted/40 line-clamp-2">
                 {sentences[currentIndex + 1]?.text || ''}
               </p>
@@ -241,18 +290,23 @@ export function ReaderPage() {
           )}
         </div>
 
-        <div className="w-full mb-4">
+        <div className="w-full mb-5">
           <div
-            className="h-8 flex items-center cursor-pointer relative group"
+            ref={progressBarRef}
+            className="h-8 flex items-center cursor-pointer relative group select-none touch-none"
             onClick={handleProgressClick}
+            onMouseDown={handleDragStart}
+            onTouchStart={handleDragStart}
           >
             <div className="w-full h-1.5 bg-border/30 rounded-full overflow-hidden relative">
               <div
-                className="h-full bg-primary rounded-full transition-all duration-500"
+                className={`h-full bg-primary rounded-full ${isDragging ? '' : 'transition-all duration-500'}`}
                 style={{ width: `${progress * 100}%` }}
               />
               <div
-                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-primary rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-primary rounded-full shadow-md transition-opacity ${
+                  isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                }`}
                 style={{ left: `calc(${progress * 100}% - 8px)` }}
               />
             </div>
@@ -264,8 +318,8 @@ export function ReaderPage() {
         </div>
       </div>
 
-      <div className={`p-4 pb-8 border-t ${theme === 'dark' ? 'border-border-dark' : 'border-border'}`}>
-        <div className="flex items-center justify-center gap-6">
+      <div className={`p-5 pb-10 border-t ${theme === 'dark' ? 'border-border-dark' : 'border-border'}`}>
+        <div className="flex items-center justify-center gap-8">
           <button
             onClick={handlePrev}
             disabled={currentIndex === 0}
@@ -305,7 +359,7 @@ export function ReaderPage() {
           </button>
         </div>
 
-        <div className="flex items-center justify-center gap-3 mt-4">
+        <div className="flex items-center justify-center gap-3 mt-5">
           <button
             onClick={() => setShowSpeedMenu(true)}
             className="text-xs font-medium px-3 py-1.5 rounded-full bg-surface-card text-text-muted hover:text-text transition-colors"
@@ -366,7 +420,7 @@ export function ReaderPage() {
               {Object.keys(fontSizes).map((s) => (
                 <button
                   key={s}
-                  onClick={() => setFontSize(s)}
+                  onClick={() => setFontSize(s as FontSize)}
                   className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${
                     fontSize === s ? 'bg-primary text-white' : 'bg-surface-card text-text hover:bg-border'
                   }`}

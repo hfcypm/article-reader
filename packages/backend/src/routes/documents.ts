@@ -52,6 +52,17 @@ export const documentRoutes = new Elysia({ prefix: '/api/documents' })
     }
   })
 
+  .get('/:id/progress', async ({ params, userId, set }) => {
+    try {
+      const progress = await documentService.getProgress(userId, params.id);
+      return success(progress);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : '查询失败';
+      set.status = 404;
+      return error(message);
+    }
+  })
+
   .put('/:id/title', async ({ params, body, userId, set }) => {
     try {
       const doc = await documentService.updateTitle(userId, params.id, body.title);

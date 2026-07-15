@@ -1,12 +1,14 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useAuthStore } from './store/authStore';
+import { useSettingsStore } from './store/settingsStore';
 import { MainLayout } from './components/layout/MainLayout';
 import { HomePage } from './pages/HomePage';
 import { BookshelfPage } from './pages/BookshelfPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { DetailPage } from './pages/DetailPage';
 import { ReaderPage } from './pages/ReaderPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 
@@ -18,10 +20,25 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const { checkAuth, isLoading, isAuthenticated } = useAuthStore();
+  const { load, theme, language } = useSettingsStore();
 
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute('lang', language);
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [theme, language]);
 
   if (isLoading) {
     return (
@@ -50,6 +67,7 @@ export default function App() {
       </Route>
       <Route path="/detail/:docId" element={<ProtectedRoute><DetailPage /></ProtectedRoute>} />
       <Route path="/reader/:docId" element={<ProtectedRoute><ReaderPage /></ProtectedRoute>} />
+      <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
     </Routes>
   );
 }

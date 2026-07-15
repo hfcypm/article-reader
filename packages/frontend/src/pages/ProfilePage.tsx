@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { showToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/store/authStore';
 import { api } from '@/lib/api';
+import { t } from '@/lib/i18n';
 import type { UserProfile } from '@/types';
 
 export function ProfilePage() {
@@ -38,8 +39,8 @@ export function ProfilePage() {
 
   return (
     <div className="page">
-      <div className="p-4 pt-6 fade-in">
-        <h1 className="text-xl font-bold text-text mb-6">我的</h1>
+      <div className="pt-7 pb-10 fade-in">
+        <h1 className="text-xl font-bold text-text mb-6">{t('profile')}</h1>
 
         <Card className="mb-6">
           <div className="flex items-center gap-4">
@@ -58,28 +59,32 @@ export function ProfilePage() {
           </div>
         </Card>
 
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-3 gap-4 mb-6">
           <Card className="text-center py-4">
             <p className="text-2xl font-bold text-primary">{profile?.bookshelfCount || 0}</p>
-            <p className="text-xs text-text-muted mt-1">书架数量</p>
+            <p className="text-xs text-text-muted mt-1">{t('profile.bookshelf')}</p>
           </Card>
           <Card className="text-center py-4">
             <p className="text-2xl font-bold text-accent-green">{profile?.totalReadSentences || 0}</p>
-            <p className="text-xs text-text-muted mt-1">已读句数</p>
+            <p className="text-xs text-text-muted mt-1">{t('profile.sentences')}</p>
           </Card>
           <Card className="text-center py-4">
             <p className="text-2xl font-bold text-text">{profile?.bookshelfCount || 0}</p>
-            <p className="text-xs text-text-muted mt-1">已读篇数</p>
+            <p className="text-xs text-text-muted mt-1">{t('profile.articles')}</p>
           </Card>
         </div>
 
-        <div className="space-y-2 mb-6">
+        <div className="space-y-3 mb-6">
           {[
-            { icon: 'settings', label: '阅读设置', desc: '倍速、字号、主题' },
-            { icon: 'shield', label: '隐私设置', desc: '数据与权限管理' },
-            { icon: 'info', label: '关于', desc: '版本 1.0.0' },
+            { icon: 'settings', label: t('profile.settings'), desc: t('profile.settings.desc') },
+            { icon: 'shield', label: t('profile.privacy'), desc: t('profile.privacy.desc') },
+            { icon: 'info', label: t('profile.about'), desc: t('profile.about.desc') },
           ].map((item) => (
-            <Card key={item.label} className="flex items-center gap-3 cursor-pointer hover:bg-surface-card/80 transition-colors">
+            <Card
+              key={item.label}
+              className="flex items-center gap-3 cursor-pointer hover:bg-surface-card/80 transition-colors"
+              onClick={() => item.icon === 'settings' && navigate('/settings')}
+            >
               <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   {item.icon === 'settings' && (
@@ -114,7 +119,7 @@ export function ProfilePage() {
         </div>
 
         <Button variant="ghost" className="w-full text-text-muted" onClick={handleLogout}>
-          退出登录
+          {t('profile.logout')}
         </Button>
       </div>
     </div>

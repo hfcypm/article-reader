@@ -7,7 +7,9 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Dialog } from '@/components/ui/dialog';
 import { showToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
-import { formatDate } from '@/lib/utils';
+import { formatDate, cn } from '@/lib/utils';
+import { t } from '@/lib/i18n';
+import { useLongPress } from '@/lib/useLongPress';
 import type { DocumentSummary, BookshelfItem } from '@/types';
 
 type ImportState = {
@@ -19,6 +21,7 @@ type ImportState = {
   format?: string;
   wordCount?: number;
   sentenceCount?: number;
+  progress?: number;
 };
 
 export function HomePage() {
@@ -26,12 +29,43 @@ export function HomePage() {
   const [continueReading, setContinueReading] = useState<BookshelfItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [importState, setImportState] = useState<ImportState>({ status: 'idle', fileName: '' });
+  const [deleteTarget, setDeleteTarget] = useState<DocumentSummary | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [displayProgress, setDisplayProgress] = useState(0);
+  const serverProgressRef = useRef(0);
+  const selfTargetRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (importState.status !== 'checking' && importState.status !== 'parsing') {
+      setDisplayProgress(0);
+      serverProgressRef.current = 0;
+      selfTargetRef.current = 0;
+      return;
+    }
+
+    setDisplayProgress(0);
+    serverProgressRef.current = 0;
+    selfTargetRef.current = 0;
+
+    const timer = setInterval(() => {
+      selfTargetRef.current = Math.min(selfTargetRef.current + 0.5, 70);
+      const effectiveTarget = Math.max(serverProgressRef.current, selfTargetRef.current);
+
+      setDisplayProgress((prev) => {
+        if (prev >= effectiveTarget) return prev;
+        const step = Math.max(0.3, (effectiveTarget - prev) * 0.05);
+        return Math.min(prev + step, effectiveTarget);
+      });
+    }, 50);
+
+    return () => clearInterval(timer);
+  }, [importState.status]);
 
   const loadData = async () => {
     setLoading(true);
@@ -63,37 +97,82 @@ export function HomePage() {
       return;
     }
 
-    setImportState({ status: 'checking', fileName });
+    setImportState({ status: 'checking', fileName, progress: 0 });
 
     const dup = await api.post<{ exists: boolean }>('/documents/check-duplicate', { fileName });
     if (dup.data?.exists) {
-      setImportState({ status: 'error', fileName, errorMsg: '该文件已导入' });
+      setImportState({ status: 'error', fileName, errorMsg: '该文件已导入', progress: 0 });
       e.target.value = '';
       return;
     }
 
-    setImportState({ status: 'parsing', fileName });
+    setImportState({ status: 'parsing', fileName, progress: 0 });
 
     const formData = new FormData();
     formData.append('file', file);
 
     try {
-      const res = await api.post<DocumentSummary & { sentenceCount: number; format: string }>('/documents/import', formData);
-      if (res.success && res.data) {
-        setImportState({
-          status: 'success',
-          fileName,
-          docId: res.data.id,
-          title: res.data.title || fileName.replace(/\.[^.]+$/, ''),
-          format: res.data.format || ext,
-          wordCount: res.data.wordCount,
-          sentenceCount: (res.data as { sentenceCount: number }).sentenceCount || 0,
-        });
-      } else {
-        setImportState({ status: 'error', fileName, errorMsg: res.error || '导入失败' });
+      const res = await api.post<{ id: string }>('/documents/import', formData);
+      if (!res.success || !res.data) {
+        setImportState({ status: 'error', fileName, errorMsg: res.error || '导入失败', progress: 0 });
+        e.target.value = '';
+        return;
       }
+
+      const docId = res.data.id;
+      let successData: { title: string; format: string; wordCount: number; sentenceCount: number } | null = null;
+
+      const pollProgress = async () => {
+        for (let i = 0; i < 120; i++) {
+          await new Promise((r) => setTimeout(r, 500));
+          const progressRes = await api.get<{
+            status: string; progress: number; title: string;
+            format: string; wordCount: number; sentenceCount: number;
+          }>(`/documents/${docId}/progress`);
+
+          if (!progressRes.success || !progressRes.data) continue;
+
+          const { status, progress, title, format, wordCount, sentenceCount } = progressRes.data;
+          serverProgressRef.current = progress;
+
+          if (status === 'failed') {
+            setImportState({ status: 'error', fileName, errorMsg: '解析失败', progress: 0 });
+            return;
+          }
+
+          setImportState({
+            status: 'parsing',
+            fileName,
+            docId,
+            progress,
+          });
+
+          if (status === 'completed') {
+            serverProgressRef.current = 100;
+            selfTargetRef.current = 100;
+            successData = {
+              title: title || fileName.replace(/\.[^.]+$/, ''),
+              format: format || ext,
+              wordCount,
+              sentenceCount,
+            };
+            await new Promise((r) => setTimeout(r, 1000));
+            setImportState({
+              status: 'success',
+              fileName,
+              docId,
+              ...successData,
+              progress: 100,
+            });
+            return;
+          }
+        }
+        setImportState({ status: 'error', fileName, errorMsg: '处理超时，请重试', progress: 0 });
+      };
+
+      pollProgress();
     } catch {
-      setImportState({ status: 'error', fileName, errorMsg: '解析失败，请重试' });
+      setImportState({ status: 'error', fileName, errorMsg: '导入请求失败，请重试', progress: 0 });
     }
     e.target.value = '';
   };
@@ -105,21 +184,61 @@ export function HomePage() {
     setImportState({ status: 'idle', fileName: '' });
   };
 
+  const handleDeleteDocument = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const res = await api.delete(`/documents/${deleteTarget.id}`);
+    if (res.success) {
+      showToast(`「${deleteTarget.title}」已删除`, 'success');
+      setRecentImports((prev) => prev.filter((d) => d.id !== deleteTarget.id));
+    } else {
+      showToast(res.error || '删除失败', 'error');
+    }
+    setDeleting(false);
+    setDeleteTarget(null);
+  };
+
   useEffect(() => {
     if (importState.status === 'success' || importState.status === 'error') return;
   }, [importState.status]);
 
   const isImporting = importState.status === 'checking' || importState.status === 'parsing';
 
+  function RecentImportItem({ doc }: { doc: DocumentSummary }) {
+    const { handlers } = useLongPress(() => setDeleteTarget(doc));
+
+    return (
+      <button
+        onClick={() => navigate(`/detail/${doc.id}`)}
+        className="w-full"
+        {...handlers}
+      >
+        <Card className="flex items-center gap-4 book-card p-5">
+           <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0 text-left">
+            <p className="text-sm font-medium text-text truncate">{doc.title}</p>
+            <p className="text-xs text-text-muted">{formatDate(doc.importedAt)}</p>
+          </div>
+          <Badge variant="default">{doc.format.toUpperCase()}</Badge>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </Card>
+      </button>
+    );
+  }
+
   return (
     <div className="page">
       <div className="flex flex-col p-4 pt-6 fade-in">
-        <div className="w-1/2 h-80 bg-accent-green p-10">
-          <span className="block mt-10 mx-10 text-sm text-text-muted">hello123</span>
-        </div>
-
-
-        <h1 className="text-xl font-bold text-text mb-6">文章阅读</h1>
+        <h1 className="text-xl font-bold text-text mb-8">{t('home.title')}</h1>
 
         <input
           ref={fileInputRef}
@@ -142,13 +261,13 @@ export function HomePage() {
               <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
           </div>
-          <span className="text-sm font-medium text-primary">导入本地文档</span>
-          <span className="text-xs text-text-muted">支持 TXT / MOBI / PDF 格式，最大 50MB</span>
+          <span className="text-sm font-medium text-primary">{t('home.import')}</span>
+          <span className="text-xs text-text-muted">{t('home.import.hint')}</span>
         </button>
 
         {continueReading.length > 0 && (
-          <section className="mb-6">
-            <h2 className="text-base font-semibold text-text mb-3">继续阅读</h2>
+           <section className="mb-10">
+            <h2 className="text-base font-semibold text-text mb-6">{t('home.continueReading')}</h2>
             <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
               {continueReading.map((item) => (
                 <button
@@ -156,7 +275,7 @@ export function HomePage() {
                   onClick={() => navigate(`/reader/${item.docId}`)}
                   className="flex-shrink-0 w-36 snap-start"
                 >
-                  <Card className="h-full book-card flex flex-col gap-2 text-left">
+                   <Card className="h-full book-card flex flex-col gap-4 text-left p-5">
                     <div className="flex-1">
                       <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-2">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -180,41 +299,18 @@ export function HomePage() {
         )}
 
         <section>
-          <h2 className="text-base font-semibold text-text mb-3">最近导入</h2>
+           <h2 className="text-base font-semibold text-text mb-6">{t('home.recentImport')}</h2>
           {loading ? (
-            <div className="text-center py-8 text-text-muted text-sm">加载中...</div>
+            <div className="text-center py-12 text-text-muted text-sm">{t('home.loading')}</div>
           ) : recentImports.length === 0 ? (
             <EmptyState
-              title="尚无导入记录"
-              description="点击上方按钮导入你的第一篇文档"
+              title={t('home.noImports')}
+              description={t('home.noImports.desc')}
             />
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-4">
               {recentImports.map((doc) => (
-                <button
-                  key={doc.id}
-                  onClick={() => navigate(`/detail/${doc.id}`)}
-                  className="w-full"
-                >
-                  <Card className="flex items-center gap-3 book-card">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                        <polyline points="14 2 14 8 20 8" />
-                        <line x1="16" y1="13" x2="8" y2="13" />
-                        <line x1="16" y1="17" x2="8" y2="17" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0 text-left">
-                      <p className="text-sm font-medium text-text truncate">{doc.title}</p>
-                      <p className="text-xs text-text-muted">{formatDate(doc.importedAt)}</p>
-                    </div>
-                    <Badge variant="default">{doc.format.toUpperCase()}</Badge>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="9 18 15 12 9 6" />
-                    </svg>
-                  </Card>
-                </button>
+                <RecentImportItem key={doc.id} doc={doc} />
               ))}
             </div>
           )}
@@ -233,22 +329,64 @@ export function HomePage() {
         }
       >
         {isImporting && (
-          <div className="flex flex-col items-center py-4">
-            <div className="relative w-16 h-16 mb-4">
-              <svg className="animate-spin w-16 h-16 text-primary/20" viewBox="0 0 64 64" fill="none">
-                <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="4" />
-                <path d="M32 4a28 28 0 0 1 28 28" stroke="var(--color-primary)" strokeWidth="4" strokeLinecap="round" />
+          <div className="flex flex-col items-center py-5">
+            <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-5">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
               </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                </svg>
+            </div>
+
+            <p className="text-5xl font-bold text-primary mb-3 tabular-nums">
+              {Math.round(displayProgress)}%
+            </p>
+
+            <div className="w-full space-y-2 mb-4">
+              <div className={cn(
+                'flex items-center gap-2 text-xs',
+                importState.status === 'checking' ? 'text-primary font-medium' : 'text-text-muted/40'
+              )}>
+                <div className={cn(
+                  'w-4 h-4 rounded-full flex items-center justify-center text-[10px]',
+                  importState.status === 'checking' ? 'bg-primary text-white' :
+                  importState.status === 'parsing' ? 'bg-accent-green text-white' : 'bg-border text-text-muted/40'
+                )}>
+                  {importState.status === 'checking' ? (
+                    <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeDashoffset="8" />
+                    </svg>
+                  ) : importState.status === 'parsing' ? (
+                    <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  ) : '1'}
+                </div>
+                <span>检查文件重复</span>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs">
+                <div className={cn(
+                  'w-4 h-4 rounded-full flex items-center justify-center text-[10px]',
+                  importState.status === 'parsing' ? 'bg-primary text-white' : 'bg-border text-text-muted/40'
+                )}>
+                  {importState.status === 'parsing' ? (
+                    <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeDashoffset="8" />
+                    </svg>
+                  ) : '2'}
+                </div>
+                <span className={importState.status === 'parsing' ? 'text-primary font-medium' : 'text-text-muted/40'}>
+                  解析文本内容
+                </span>
               </div>
             </div>
-            <p className="text-sm text-text-muted mb-1">
-              {importState.status === 'checking' ? '检查文件是否已导入...' : '识别文字内容中...'}
-            </p>
+
+            <div className="w-full bg-border rounded-full overflow-hidden h-1.5 mb-3">
+              <div
+                className="h-full bg-primary rounded-full transition-none"
+                style={{ width: `${Math.min(displayProgress, 100)}%` }}
+              />
+            </div>
             <p className="text-xs text-text-muted/60 truncate max-w-full px-4">{importState.fileName}</p>
           </div>
         )}
@@ -302,6 +440,33 @@ export function HomePage() {
             </div>
           </div>
         )}
+      </Dialog>
+
+      <Dialog
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        title="确认删除"
+      >
+        <div className="text-center py-2">
+          <div className="w-14 h-14 rounded-full bg-accent-red/10 flex items-center justify-center mx-auto mb-4">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-red)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+          </div>
+          <p className="text-sm text-text-muted mb-1">
+            确定要删除「{deleteTarget?.title}」吗？
+          </p>
+          <p className="text-xs text-text-muted/60">删除后无法恢复</p>
+        </div>
+        <div className="flex gap-2 mt-5">
+          <Button variant="secondary" className="flex-1 h-11" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+            取消
+          </Button>
+          <Button variant="danger" className="flex-1 h-11" onClick={handleDeleteDocument} disabled={deleting}>
+            {deleting ? '删除中...' : '确认删除'}
+          </Button>
+        </div>
       </Dialog>
     </div>
   );

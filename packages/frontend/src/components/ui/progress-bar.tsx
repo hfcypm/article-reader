@@ -5,10 +5,27 @@ interface ProgressBarProps {
   className?: string;
   showLabel?: boolean;
   size?: 'sm' | 'md';
+  indeterminate?: boolean;
 }
 
-export function ProgressBar({ progress, className, showLabel, size = 'md' }: ProgressBarProps) {
+export function ProgressBar({ progress, className, showLabel, size = 'md', indeterminate }: ProgressBarProps) {
   const heights = { sm: 'h-1', md: 'h-1.5' };
+
+  if (indeterminate) {
+    return (
+      <div className={cn('w-full', className)}>
+        <div className={cn('bg-border rounded-full overflow-hidden', heights[size])}>
+          <div
+            className={cn(
+              'bg-primary rounded-full animate-indeterminate',
+              heights[size]
+            )}
+            style={{ width: '40%' }}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn('flex items-center gap-2', className)}>

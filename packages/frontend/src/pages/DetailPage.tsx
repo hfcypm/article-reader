@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/dialog';
 import { showToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
-import { formatDate } from '@/lib/utils';
+import { formatDate, SPEED_OPTIONS, type SpeedOption } from '@/lib/utils';
 import type { Document } from '@/types';
 
 const STAT_CONFIG = [
@@ -41,6 +41,7 @@ export function DetailPage() {
   const [editTitle, setEditTitle] = useState('');
   const [showEdit, setShowEdit] = useState(false);
   const [previewExpanded, setPreviewExpanded] = useState(false);
+  const [speed, setSpeed] = useState<SpeedOption>(1.0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -151,7 +152,7 @@ export function DetailPage() {
       />
 
       <div className="flex-1 overflow-y-auto">
-        <div className="relative px-5 pt-6 pb-4">
+          <div className="relative px-6 pt-8 pb-6">
           <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-primary/6 to-transparent pointer-events-none" />
 
           <div className="relative flex items-start gap-4 mb-6">
@@ -195,8 +196,8 @@ export function DetailPage() {
             ))}
           </div>
 
-          <div className="mb-4">
-            <div className="flex items-center gap-2 mb-3">
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-4">
               <div className="w-1 h-4 rounded-full bg-primary" />
               <h2 className="text-sm font-semibold text-text">正文预览</h2>
             </div>
@@ -225,31 +226,49 @@ export function DetailPage() {
         </div>
       </div>
 
-      <div className="p-4 border-t border-border/60 bg-surface/95 backdrop-blur-sm">
-        {inBookshelf ? (
-          <Button className="w-full h-12 text-sm shadow-lg shadow-primary/20" onClick={() => navigate(`/reader/${docId}`)}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="5 3 19 12 5 21 5 3"/>
-            </svg>
-            继续阅读
-          </Button>
-        ) : (
-          <div className="flex gap-3">
-            <Button variant="secondary" className="flex-1 h-12 text-sm" onClick={handleAddToBookshelf}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-              </svg>
-              加入书架
-            </Button>
-            <Button className="flex-1 h-12 text-sm shadow-lg shadow-primary/20" onClick={() => navigate(`/reader/${docId}`)}>
+      <div className="p-5 border-t border-border/60 bg-surface/95 backdrop-blur-sm">
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-0.5 bg-surface-card rounded-lg p-0.5 flex-shrink-0">
+            {[0.75, 1.0, 1.5, 2.0].map((s) => (
+              <button
+                key={s}
+                onClick={() => setSpeed(s as SpeedOption)}
+                className={`min-w-[36px] h-7 flex items-center justify-center rounded-md text-[11px] font-semibold transition-colors ${
+                  speed === s
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'text-text-muted hover:text-text hover:bg-white'
+                }`}
+              >
+                {s}x
+              </button>
+            ))}
+          </div>
+
+          {inBookshelf ? (
+            <Button className="flex-1 h-11 text-sm shadow-lg shadow-primary/20" onClick={() => navigate(`/reader/${docId}`, { state: { speed } })}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="5 3 19 12 5 21 5 3"/>
               </svg>
-              开始阅读
+              继续阅读
             </Button>
-          </div>
-        )}
+          ) : (
+            <div className="flex gap-2 flex-1">
+              <Button variant="secondary" className="flex-1 h-11 text-sm" onClick={handleAddToBookshelf}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+                加入书架
+              </Button>
+              <Button className="flex-1 h-11 text-sm shadow-lg shadow-primary/20" onClick={() => navigate(`/reader/${docId}`, { state: { speed } })}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                开始阅读
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       <Dialog
@@ -273,7 +292,7 @@ export function DetailPage() {
             </svg>
             加入书架
           </Button>
-          <Button variant="secondary" className="w-full h-11" onClick={() => { setShowPrompt(false); navigate(`/reader/${docId}`); }}>
+          <Button variant="secondary" className="w-full h-11" onClick={() => { setShowPrompt(false); navigate(`/reader/${docId}`, { state: { speed } }); }}>
             直接阅读
           </Button>
           <Button variant="ghost" className="w-full h-11" onClick={() => setShowPrompt(false)}>

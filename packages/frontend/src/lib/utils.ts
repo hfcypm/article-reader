@@ -25,6 +25,8 @@ export function formatProgress(progress: number): string {
 
 export const SPEED_OPTIONS = [0.75, 1.0, 1.25, 1.5, 2.0] as const;
 
+export type SpeedOption = (typeof SPEED_OPTIONS)[number];
+
 export const FONT_SIZES = {
   small: "text-base",
   medium: "text-lg",
