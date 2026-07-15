@@ -139,9 +139,9 @@ const translations: TranslationMap = {
     'en': 'Articles',
   },
   'home.title': {
-    'zh-CN': '文章阅读',
-    'zh-TW': '文章閱讀',
-    'en': 'Article Reader',
+    'zh-CN': '首页',
+    'zh-TW': '閱頁',
+    'en': 'Home',
   },
   'home.import': {
     'zh-CN': '导入本地文档',
@@ -179,9 +179,9 @@ const translations: TranslationMap = {
     'en': 'Loading...',
   },
   'bookshelf': {
-    'zh-CN': '我的书架',
-    'zh-TW': '我的書架',
-    'en': 'My Bookshelf',
+    'zh-CN': '书架',
+    'zh-TW': '書架',
+    'en': 'Bookshelf',
   },
   'bookshelf.loading': {
     'zh-CN': '加载中...',
