@@ -42,7 +42,7 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <div className="h-full flex items-center justify-center bg-[var(--color-bg)]">
+      <div className="h-full flex items-center justify-center bg-surface">
         <div className="flex flex-col items-center gap-4 fade-in">
           <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

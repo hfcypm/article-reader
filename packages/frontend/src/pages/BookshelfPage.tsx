@@ -142,13 +142,13 @@ export function BookshelfPage() {
           </Button>
         </div>
 
-        <div className="flex gap-1.5 mb-6 p-1 bg-surface-card rounded-xl">
+        <div className="flex gap-1.5 mb-6 p-1 bg-surface rounded-xl">
           {sortOptions.map((opt) => (
             <button
               key={opt.key}
               onClick={() => setSortBy(opt.key)}
               className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${
-                sortBy === opt.key ? 'bg-white text-text shadow-sm' : 'text-text-muted'
+                sortBy === opt.key ? 'bg-surface-card text-text shadow-sm ring-1 ring-border/30' : 'text-text-muted'
               }`}
             >
               {opt.label}

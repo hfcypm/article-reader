@@ -4,16 +4,11 @@
   --color-primary: #6c5ce7;
   --color-primary-light: #a29bfe;
   --color-primary-dark: #5a4bd1;
-  --color-surface: #ffffff;
-  --color-surface-dark: #1a1a2e;
-  --color-surface-card: #f8f9fa;
-  --color-surface-card-dark: #16213e;
-  --color-text: #2d3436;
-  --color-text-dark: #e2e8f0;
-  --color-text-muted: #636e72;
-  --color-text-muted-dark: #94a3b8;
-  --color-border: #e2e8f0;
-  --color-border-dark: #334155;
+  --color-surface: var(--surface);
+  --color-surface-card: var(--surface-card);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-border: var(--border);
   --color-accent-green: #00b894;
   --color-accent-orange: #fdcb6e;
   --color-accent-red: #ff7675;
@@ -21,21 +16,21 @@
 }
 
 :root {
-  --color-bg: var(--color-surface);
-  --color-fg: var(--color-text);
-  --card-bg: var(--color-surface-card);
-  --card-border: var(--color-border);
-  --muted-fg: var(--color-text-muted);
-  --body-bg: var(--color-surface);
+  --surface: #ffffff;
+  --surface-card: #f8f9fa;
+  --text: #2d3436;
+  --text-muted: #636e72;
+  --border: #e2e8f0;
+  color-scheme: light;
 }
 
 .dark {
-  --color-bg: var(--color-surface-dark);
-  --color-fg: var(--color-text-dark);
-  --card-bg: var(--color-surface-card-dark);
-  --card-border: var(--color-border-dark);
-  --muted-fg: var(--color-text-muted-dark);
-  --body-bg: var(--color-surface-dark);
+  --surface: #1a1a2e;
+  --surface-card: #16213e;
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --border: #334155;
+  color-scheme: dark;
 }
 
 @layer base {
@@ -58,8 +53,8 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
     'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial,
     sans-serif;
-  background-color: var(--color-bg);
-  color: var(--color-fg);
+  background-color: var(--surface);
+  color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
