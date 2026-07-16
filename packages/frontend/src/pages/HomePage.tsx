@@ -12,6 +12,10 @@ import { t } from '@/lib/i18n';
 import { useLongPress } from '@/lib/useLongPress';
 import type { DocumentSummary, BookshelfItem } from '@/types';
 
+/**
+ * 文档导入状态机类型
+ * idle: 空闲 | checking: 检查重复 | parsing: 解析中 | success: 完成 | error: 失败
+ */
 type ImportState = {
   status: 'idle' | 'checking' | 'parsing' | 'success' | 'error';
   fileName: string;
@@ -24,23 +28,40 @@ type ImportState = {
   progress?: number;
 };
 
+/**
+ * 首页 - 文档导入入口、最近导入列表和继续阅读推荐
+ */
 export function HomePage() {
+  /** 最近导入的文档列表 */
   const [recentImports, setRecentImports] = useState<DocumentSummary[]>([]);
+  /** 继续阅读推荐列表 */
   const [continueReading, setContinueReading] = useState<BookshelfItem[]>([]);
+  /** 页面加载中 */
   const [loading, setLoading] = useState(true);
+  /** 导入流程状态 */
   const [importState, setImportState] = useState<ImportState>({ status: 'idle', fileName: '' });
+  /** 待删除的文档 */
   const [deleteTarget, setDeleteTarget] = useState<DocumentSummary | null>(null);
+  /** 删除操作进行中 */
   const [deleting, setDeleting] = useState(false);
+  /** 进度条显示值（用于动画平滑过渡） */
   const [displayProgress, setDisplayProgress] = useState(0);
+  /** 服务端返回的真实进度值 */
   const serverProgressRef = useRef(0);
+  /** 前端自增目标进度值 */
   const selfTargetRef = useRef(0);
+  /** 文件选择器引用 */
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
+  /** 初次加载时获取最近导入和继续阅读数据 */
   useEffect(() => {
     loadData();
   }, []);
 
+  /**
+   * 导入进度动画效果 - 前端自增进度条线性增长，同时追赶服务端真实进度
+   */
   useEffect(() => {
     if (importState.status !== 'checking' && importState.status !== 'parsing') {
       setDisplayProgress(0);
@@ -67,6 +88,7 @@ export function HomePage() {
     return () => clearInterval(timer);
   }, [importState.status]);
 
+  /** 并行加载最近导入和继续阅读数据 */
   const loadData = async () => {
     setLoading(true);
     const [recentRes, continueRes] = await Promise.all([
@@ -78,6 +100,9 @@ export function HomePage() {
     setLoading(false);
   };
 
+  /**
+   * 处理文件导入 - 校验文件格式和大小，检查重复，上传并轮询解析进度
+   */
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -177,6 +202,7 @@ export function HomePage() {
     e.target.value = '';
   };
 
+  /** 关闭导入对话框 - 导入成功时跳转到详情页 */
   const handleCloseImportDialog = () => {
     if (importState.status === 'success' && importState.docId) {
       navigate(`/detail/${importState.docId}`);
@@ -184,6 +210,7 @@ export function HomePage() {
     setImportState({ status: 'idle', fileName: '' });
   };
 
+  /** 删除指定文档 */
   const handleDeleteDocument = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -202,12 +229,17 @@ export function HomePage() {
     if (importState.status === 'success' || importState.status === 'error') return;
   }, [importState.status]);
 
+  /** 是否正在导入中 */
   const isImporting = importState.status === 'checking' || importState.status === 'parsing';
 
+  /**
+   * 最近导入项子组件 - 展示单个文档摘要信息
+   */
   function RecentImportItem({ doc }: { doc: DocumentSummary }) {
     const { handlers } = useLongPress(() => setDeleteTarget(doc));
 
     return (
+      /* 文档摘要卡片 */
       <button
         onClick={() => navigate(`/detail/${doc.id}`)}
         className="w-full"
@@ -238,8 +270,10 @@ export function HomePage() {
   return (
     <div className="page">
       <div className="flex flex-col p-4 pt-6 fade-in">
+        {/* 页面标题 */}
         <h1 className="text-xl font-bold text-text mb-8">{t('home.title')}</h1>
 
+        {/* 隐藏的文件选择器 */}
         <input
           ref={fileInputRef}
           type="file"
@@ -248,6 +282,7 @@ export function HomePage() {
           onChange={handleImport}
         />
 
+        {/* 文档导入区域 - 点击触发文件选择器 */}
         <button
           onClick={() => fileInputRef.current?.click()}
           className="w-full h-32 rounded-2xl border-2 border-dashed border-primary/30
@@ -266,6 +301,7 @@ export function HomePage() {
         </button>
 
         {continueReading.length > 0 && (
+           /* 继续阅读推荐区域 */
            <section className="mb-10">
             <h2 className="text-base font-semibold text-text mb-6">{t('home.continueReading')}</h2>
             <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
@@ -299,6 +335,7 @@ export function HomePage() {
         )}
 
         <section>
+           {/* 最近导入区域 */}
            <h2 className="text-base font-semibold text-text mb-6">{t('home.recentImport')}</h2>
           {loading ? (
             <div className="text-center py-12 text-text-muted text-sm">{t('home.loading')}</div>
@@ -317,6 +354,7 @@ export function HomePage() {
         </section>
       </div>
 
+      {/* 导入进度对话框 */}
       <Dialog
         open={importState.status !== 'idle'}
         onClose={handleCloseImportDialog}
@@ -329,6 +367,7 @@ export function HomePage() {
         }
       >
         {isImporting && (
+          /* 导入进行中 - 显示进度与步骤 */
           <div className="flex flex-col items-center py-5">
             <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-5">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -392,6 +431,7 @@ export function HomePage() {
         )}
 
         {importState.status === 'success' && (
+          /* 导入成功 - 展示文档摘要信息 */
           <div className="flex flex-col items-center py-2">
             <div className="w-14 h-14 rounded-full bg-accent-green/10 flex items-center justify-center mb-4">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-green)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -420,6 +460,7 @@ export function HomePage() {
         )}
 
         {importState.status === 'error' && (
+          /* 导入失败 - 展示错误信息和重试入口 */
           <div className="flex flex-col items-center py-2">
             <div className="w-14 h-14 rounded-full bg-accent-red/10 flex items-center justify-center mb-4">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-red)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -442,6 +483,7 @@ export function HomePage() {
         )}
       </Dialog>
 
+      {/* 确认删除对话框 */}
       <Dialog
         open={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}

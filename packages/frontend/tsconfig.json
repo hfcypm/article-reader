@@ -1,25 +1,26 @@
 {
+  // 前端 TypeScript 编译配置 - 面向 Vite + React 19
   "compilerOptions": {
-    "target": "ES2020",
-    "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "skipLibCheck": true,
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "isolatedModules": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-    "jsx": "react-jsx",
-    "strict": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "baseUrl": ".",
+    "target": "ES2020",                    // 编译目标 ES2020，兼容主流浏览器
+    "useDefineForClassFields": true,       // 使用标准 class fields 语义
+    "lib": ["ES2020", "DOM", "DOM.Iterable"], // 包含的运行时库类型
+    "module": "ESNext",                    // ES Module 输出，由 Vite 处理
+    "skipLibCheck": true,                  // 跳过依赖库类型检查
+    "moduleResolution": "bundler",         // 使用 bundler 模式（Vite 兼容）
+    "allowImportingTsExtensions": true,    // 允许 .ts/.tsx 扩展名导入
+    "isolatedModules": true,               // 每个文件独立转译（Vite 按文件处理）
+    "moduleDetection": "force",            // 强制所有文件作为模块处理
+    "noEmit": true,                        // 不生成 JS 文件（Vite 负责转译）
+    "jsx": "react-jsx",                    // React 17+ 新版 JSX 转换
+    "strict": true,                        // 启用所有严格类型检查
+    "noUnusedLocals": false,               // 不检查未使用的局部变量
+    "noUnusedParameters": false,           // 不检查未使用的参数
+    "noFallthroughCasesInSwitch": true,    // 禁止 switch 隐式穿透
+    "forceConsistentCasingInFileNames": true, // 强制文件名大小写一致
+    "resolveJsonModule": true,             // 允许导入 JSON 模块
+    "baseUrl": ".",                        // 路径解析基准目录
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"]                   // @ 别名 → src/ 目录
     }
   },
   "include": ["src"]

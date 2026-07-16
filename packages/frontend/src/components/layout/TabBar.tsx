@@ -1,14 +1,26 @@
+/**
+ * TabBar 底部标签栏组件
+ * 固定底部导航，三个 Tab（首页/书架/我的），点击时带滑动方向感知动画
+ */
+
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/store/authStore';
 import { t } from '@/lib/i18n';
 import type { TabPage } from '@/types';
 
+/** Tab 配置：键值、i18n key、图标名、路由路径 */
 const tabs: { key: TabPage; labelKey: string; icon: string; path: string }[] = [
   { key: 'home', labelKey: 'home.title', icon: 'home', path: '/' },
   { key: 'bookshelf', labelKey: 'bookshelf', icon: 'bookshelf', path: '/bookshelf' },
   { key: 'profile', labelKey: 'profile', icon: 'profile', path: '/profile' },
 ];
 
+/**
+ * TabIcon — Tab 栏图标
+ * 根据 active 状态切换颜色，使用 SVG 内联图标
+ * @param name - 图标名称（home/bookshelf/profile）
+ * @param active - 是否为当前激活 Tab
+ */
 function TabIcon({ name, active }: { name: string; active: boolean }) {
   const color = active ? 'var(--color-primary)' : 'var(--color-text-muted)';
 
@@ -41,11 +53,16 @@ function TabIcon({ name, active }: { name: string; active: boolean }) {
   }
 }
 
+/**
+ * TabBar — 底部标签栏
+ * 固定定位在页面底部，根据当前激活 Tab 计算滑动方向并通知 Store
+ */
 export function TabBar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { activeTab, setActiveTab, setSlideDirection } = useAppStore();
 
+  // 根据当前路径反推对应的 Tab 标识
   const currentPath = location.pathname;
   const currentKey: TabPage = currentPath === '/' ? 'home' : currentPath === '/bookshelf' ? 'bookshelf' : 'profile';
 
@@ -54,6 +71,7 @@ export function TabBar() {
     const currentIdx = tabOrder.indexOf(currentKey);
     const targetIdx = tabOrder.indexOf(tab);
 
+    // 根据 Tab 顺序判断页面滑动方向
     if (targetIdx > currentIdx) setSlideDirection('left');
     else if (targetIdx < currentIdx) setSlideDirection('right');
 

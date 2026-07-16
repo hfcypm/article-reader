@@ -1,3 +1,11 @@
+/**
+ * 登录页面
+ *
+ * 支持两种登录方式切换：
+ * - 密码登录：手机号 + 密码
+ * - 验证码登录：手机号 + 验证码
+ * 登录成功后自动跳转到首页
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -6,13 +14,20 @@ import { useAuthStore } from '@/store/authStore';
 import { showToast } from '@/components/ui/toast';
 
 export function LoginPage() {
+  // 手机号
   const [phone, setPhone] = useState('');
+  // 密码
   const [password, setPassword] = useState('');
+  // 验证码
   const [code, setCode] = useState('');
+  // 登录模式：password（密码）或 code（验证码）
   const [mode, setMode] = useState<'password' | 'code'>('password');
+  // 登录请求进行中
   const [loading, setLoading] = useState(false);
+  // 从 zustand authStore 获取 login 方法
   const login = useAuthStore((s) => s.login);
 
+  // 执行登录：校验字段 → 调用 authStore.login → 显示结果
   const handleLogin = async () => {
     if (!phone) { showToast('请输入手机号', 'error'); return; }
     if (mode === 'password' && !password) { showToast('请输入密码', 'error'); return; }

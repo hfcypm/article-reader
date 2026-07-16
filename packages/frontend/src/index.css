@@ -1,20 +1,36 @@
+/**
+ * 全局样式表
+ *
+ * 定义项目的设计令牌（颜色、圆角、间距）、深浅主题变量、
+ * 页面布局、动画关键帧和组件级样式。
+ * 采用 TailwindCSS v4 的 @theme 机制管理主题变量，
+ * 通过 CSS 自定义属性实现 .dark 类切换深浅模式。
+ */
+
 @import "tailwindcss";
 
+/* ==================== 设计令牌（TailwindCSS v4 @theme） ==================== */
 @theme {
+  /* 品牌色 */
   --color-primary: #6c5ce7;
   --color-primary-light: #a29bfe;
   --color-primary-dark: #5a4bd1;
-  --color-surface: var(--surface);
-  --color-surface-card: var(--surface-card);
-  --color-text: var(--text);
-  --color-text-muted: var(--text-muted);
-  --color-border: var(--border);
+
+  /* 动态主题色：通过 CSS 变量桥接，实现 :root/.dark 切换 */
+  --color-surface: var(--surface);        /* 页面背景 */
+  --color-surface-card: var(--surface-card); /* 卡片背景 */
+  --color-text: var(--text);              /* 主文字色 */
+  --color-text-muted: var(--text-muted);  /* 辅助文字色 */
+  --color-border: var(--border);          /* 边框色 */
+
+  /* 语义色（不随主题变化） */
   --color-accent-green: #00b894;
   --color-accent-orange: #fdcb6e;
   --color-accent-red: #ff7675;
   --color-accent-blue: #74b9ff;
 }
 
+/* ==================== 浅色主题变量（默认） ==================== */
 :root {
   --surface: #ffffff;
   --surface-card: #f8f9fa;
@@ -24,15 +40,17 @@
   color-scheme: light;
 }
 
+/* ==================== 深色主题变量 ==================== */
 .dark {
   --surface: #1a1a2e;
   --surface-card: #16213e;
   --text: #e2e8f0;
   --text-muted: #94a3b8;
   --border: #334155;
-  color-scheme: dark;
+  color-scheme: dark; /* 告知浏览器当前为暗色模式，原生控件自动适配 */
 }
 
+/* ==================== 基础重置 ==================== */
 @layer base {
   * {
     margin: 0;
@@ -41,6 +59,7 @@
   }
 }
 
+/* ==================== 页面布局 ==================== */
 html,
 body,
 #root {
@@ -59,6 +78,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* 移动端容器最大宽度 480px，桌面端居中 + 边框 */
 #root {
   max-width: 480px;
   margin: 0 auto;
@@ -74,6 +94,7 @@ body {
   }
 }
 
+/* 通用页面容器：全高、滚动、底部留出 TabBar 空间 */
 .page {
   width: 100%;
   height: 100%;
@@ -84,9 +105,10 @@ body {
 }
 
 .page::-webkit-scrollbar {
-  width: 0;
+  width: 0; /* 隐藏滚动条 */
 }
 
+/* ==================== 页面切换动画 ==================== */
 .slide-in-right {
   animation: slideInRight 0.25s ease-out;
 }
@@ -167,6 +189,7 @@ body {
   }
 }
 
+/* ==================== 组件级样式 ==================== */
 .reader-sentence {
   transition: all 0.3s ease;
 }

@@ -1,14 +1,22 @@
 {
+  "//": "后端 - Elysia HTTP 框架 + Prisma ORM + SQLite 数据库",
   "name": "backend",
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "//_dev": "开发模式：bun --watch 热重载启动",
     "dev": "bun run --watch src/index.ts",
+    "//_build": "生产构建：bun build 打包为单文件",
     "build": "bun build src/index.ts --outdir dist",
+    "//_start": "运行构建产物",
     "start": "bun run dist/index.js",
+    "//_db-generate": "根据 schema.prisma 生成 Prisma 客户端类型",
     "db:generate": "prisma generate",
+    "//_db-push": "直接推送 schema 到数据库（开发用，不创建迁移文件）",
     "db:push": "prisma db push",
+    "//_db-migrate": "创建并应用数据库迁移（生产环境推荐）",
     "db:migrate": "prisma migrate dev",
+    "//_db-studio": "启动 Prisma Studio 可视化管理界面",
     "db:studio": "prisma studio"
   },
   "dependencies": {

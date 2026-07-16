@@ -1,3 +1,12 @@
+/**
+ * 文档详情页面
+ *
+ * 展示单个文档的元信息（格式、字数、句数、导入时间），提供：
+ * - 正文内容预览（支持展开/收起）
+ * - 加入书架 / 直接阅读入口
+ * - 书名编辑功能
+ * - 阅读速度选择器
+ */
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
@@ -9,6 +18,7 @@ import { api } from '@/lib/api';
 import { formatDate, SPEED_OPTIONS, type SpeedOption } from '@/lib/utils';
 import type { Document } from '@/types';
 
+// 文档信息统计卡片配置：key、展示标签、图标名、颜色主题
 const STAT_CONFIG = [
   { key: 'format', label: '格式', icon: 'file', color: 'text-violet-500', bg: 'bg-violet-50' },
   { key: 'wordCount', label: '字数', icon: 'text', color: 'text-sky-500', bg: 'bg-sky-50' },
@@ -16,6 +26,7 @@ const STAT_CONFIG = [
   { key: 'importedAt', label: '导入时间', icon: 'clock', color: 'text-amber-500', bg: 'bg-amber-50' },
 ] as const;
 
+// 统计项图标纯组件：根据 name 返回不同的 SVG 图标
 function StatIcon({ name }: { name: string }) {
   const cls = 'w-4 h-4';
   switch (name) {
@@ -34,20 +45,30 @@ function StatIcon({ name }: { name: string }) {
 
 export function DetailPage() {
   const { docId } = useParams<{ docId: string }>();
+  // 文档详情数据
   const [doc, setDoc] = useState<Document | null>(null);
+  // 加载状态
   const [loading, setLoading] = useState(true);
+  // 是否已加入书架
   const [inBookshelf, setInBookshelf] = useState(false);
+  // 是否显示"加入书架"提示弹窗
   const [showPrompt, setShowPrompt] = useState(false);
+  // 编辑书名时输入的标题
   const [editTitle, setEditTitle] = useState('');
+  // 是否显示编辑书名弹窗
   const [showEdit, setShowEdit] = useState(false);
+  // 正文预览是否展开
   const [previewExpanded, setPreviewExpanded] = useState(false);
+  // 阅读速度选择
   const [speed, setSpeed] = useState<SpeedOption>(1.0);
   const navigate = useNavigate();
 
+  // URL 参数 docId 变化时重新加载文档
   useEffect(() => {
     if (docId) loadDocument(docId);
   }, [docId]);
 
+  // 加载文档详情，同时查询书架判断是否已加入
   const loadDocument = async (id: string) => {
     setLoading(true);
     const res = await api.get<Document>(`/documents/${id}`);
@@ -65,6 +86,7 @@ export function DetailPage() {
     setLoading(false);
   };
 
+  // 加入书架：调用后端 POST 接口，成功后更新本地状态
   const handleAddToBookshelf = async () => {
     if (!docId) return;
     const res = await api.post('/bookshelf', { docId });
@@ -75,6 +97,7 @@ export function DetailPage() {
     }
   };
 
+  // 更新书名：调用后端 PUT 接口，成功后重新加载文档
   const handleUpdateTitle = async () => {
     if (!docId || !editTitle.trim()) return;
     const res = await api.put(`/documents/${docId}/title`, { title: editTitle.trim() });
@@ -85,8 +108,10 @@ export function DetailPage() {
     }
   };
 
+  // 提取句子数组，用于字数统计和预览展示
   const sentences = ((doc?.sentences as unknown[]) || []) as { text: string }[];
 
+  // ---- 渲染：加载中状态 ----
   if (loading) {
     return (
       <div className="h-full flex flex-col bg-surface">
@@ -108,6 +133,7 @@ export function DetailPage() {
     );
   }
 
+  // ---- 渲染：文档不存在 ----
   if (!doc) {
     return (
       <div className="h-full flex flex-col bg-surface">
@@ -126,6 +152,7 @@ export function DetailPage() {
     );
   }
 
+  // 将文档字段映射到统计卡片展示值
   const statValues: Record<string, string> = {
     format: doc.format.toUpperCase(),
     wordCount: doc.wordCount.toLocaleString(),
@@ -133,6 +160,7 @@ export function DetailPage() {
     importedAt: formatDate(doc.importedAt),
   };
 
+  // 正文预览：默认显示前 20 句，可展开
   const previewSentences = previewExpanded ? sentences : sentences.slice(0, 20);
   const hasMore = sentences.length > 20;
 

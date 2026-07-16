@@ -4,6 +4,9 @@ import { Card } from '@/components/ui/card';
 import { useSettingsStore, type FontSize, type Theme, type Language } from '@/store/settingsStore';
 import { SPEED_OPTIONS, type SpeedOption } from '@/lib/utils';
 
+/**
+ * 字体大小选项列表，用于阅读器 UI 切换
+ */
 const FONT_SIZES: { key: FontSize; label: string }[] = [
   { key: 'small', label: '小' },
   { key: 'medium', label: '中' },
@@ -11,12 +14,18 @@ const FONT_SIZES: { key: FontSize; label: string }[] = [
   { key: 'xlarge', label: '特大' },
 ];
 
+/**
+ * 界面语言选项列表
+ */
 const LANGUAGES: { key: Language; label: string }[] = [
   { key: 'zh-CN', label: '简体中文' },
   { key: 'zh-TW', label: '繁體中文' },
   { key: 'en', label: 'English' },
 ];
 
+/**
+ * 播放速度对应的中文标签映射
+ */
 const SPEED_LABELS: Record<number, string> = {
   0.75: '0.75x',
   1.0: '1.0x',
@@ -25,8 +34,12 @@ const SPEED_LABELS: Record<number, string> = {
   2.0: '2.0x',
 };
 
+/**
+ * 设置页面 - 管理阅读偏好，包括字体大小、主题、界面语言、播放速度、语音朗读
+ */
 export function SettingsPage() {
   const navigate = useNavigate();
+  /** 从全局状态中获取所有阅读偏好设置 */
   const {
     fontSize, theme, language, defaultSpeed, ttsEnabled,
     setFontSize, setTheme, setLanguage, setDefaultSpeed, setTtsEnabled,
@@ -34,11 +47,13 @@ export function SettingsPage() {
 
   return (
     <div className="h-full flex flex-col bg-surface">
+      {/* 顶部导航栏 */}
       <Header title="阅读设置" showBack onBack={() => navigate(-1)} />
 
       <div className="flex-1 overflow-y-auto page">
         <div className="pt-7 pb-10 space-y-6">
 
+          {/* 字体大小设置 */}
           <Card>
             <div className="space-y-3">
               <p className="text-sm font-medium text-text">字体大小</p>
@@ -68,6 +83,7 @@ export function SettingsPage() {
             </div>
           </Card>
 
+          {/* 主题颜色设置 */}
           <Card>
             <div className="space-y-3">
               <p className="text-sm font-medium text-text">主题颜色</p>
@@ -121,6 +137,7 @@ export function SettingsPage() {
             </div>
           </Card>
 
+          {/* 界面语言设置 */}
           <Card>
             <div className="space-y-3">
               <p className="text-sm font-medium text-text">界面语言</p>
@@ -151,6 +168,7 @@ export function SettingsPage() {
             </div>
           </Card>
 
+          {/* 默认播放速度设置 */}
           <Card>
             <div className="space-y-3">
               <p className="text-sm font-medium text-text">默认播放速度</p>
@@ -172,6 +190,7 @@ export function SettingsPage() {
             </div>
           </Card>
 
+          {/* 语音朗读开关设置 */}
           <Card>
             <button
               onClick={() => setTtsEnabled(!ttsEnabled)}

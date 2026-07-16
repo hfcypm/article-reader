@@ -1,17 +1,18 @@
 {
+  // 后端 TypeScript 编译配置 - 面向 Bun 运行时
   "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "esModuleInterop": true,
-    "strict": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "declaration": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "types": ["bun-types"]
+    "target": "ESNext",                    // 目标为最新 ES 标准，Bun 原生支持
+    "module": "ESNext",                    // ES Module 输出
+    "moduleResolution": "bundler",         // 使用 bundler 模式解析模块
+    "esModuleInterop": true,               // 允许 import CJS 模块
+    "strict": true,                        // 启用所有严格类型检查
+    "outDir": "./dist",                    // 编译输出目录
+    "rootDir": "./src",                    // 源码根目录
+    "declaration": true,                   // 生成 .d.ts 类型声明文件
+    "skipLibCheck": true,                  // 跳过依赖库的类型检查（加快编译）
+    "forceConsistentCasingInFileNames": true, // 强制文件名大小写一致
+    "resolveJsonModule": true,             // 允许导入 JSON 模块
+    "types": ["bun-types"]                 // 引入 Bun 类型定义
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

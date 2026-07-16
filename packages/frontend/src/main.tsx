@@ -1,3 +1,8 @@
+/**
+ * 应用入口文件
+ * 挂载 React 根组件到 DOM，启用 React 严格模式和 BrowserRouter 路由
+ */
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';

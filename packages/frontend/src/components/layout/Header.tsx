@@ -1,14 +1,29 @@
+/**
+ * Header 顶部导航栏组件
+ * 顶部固定导航栏，支持返回按钮、标题和右侧操作区域，可切换透明/毛玻璃背景
+ */
+
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 
+/** Header 组件属性 */
 interface HeaderProps {
+  /** 页面标题（支持文字截断） */
   title: string;
+  /** 是否显示返回按钮 */
   showBack?: boolean;
+  /** 自定义返回操作（默认使用 navigate(-1)） */
   onBack?: () => void;
+  /** 右侧操作区（按钮、图标等） */
   action?: React.ReactNode;
+  /** 透明背景模式（用于沉浸式页面，如阅读器） */
   transparent?: boolean;
 }
 
+/**
+ * Header — 顶部导航栏
+ * sticky 定位在页面顶部，支持毛玻璃效果和自定义返回行为
+ */
 export function Header({ title, showBack, onBack, action, transparent }: HeaderProps) {
   const navigate = useNavigate();
 

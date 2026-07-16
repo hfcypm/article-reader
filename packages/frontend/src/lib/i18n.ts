@@ -1,7 +1,21 @@
+/**
+ * 国际化（i18n）翻译模块
+ *
+ * 提供多语言翻译支持，当前支持：
+ * - zh-CN：简体中文
+ * - zh-TW：繁体中文
+ * - en：English
+ *
+ * translations 对象按 key 组织，每个 key 下包含各语言的译文。
+ * t() 函数从 zustand settingsStore 中读取当前语言，
+ * 查找对应翻译文本并支持 {param} 占位符替换。
+ */
 import { useSettingsStore, type Language } from '../store/settingsStore';
 
 type TranslationMap = Record<string, Record<Language, string>>;
 
+// 翻译字典：key → { 语言 → 译文 }
+// 每个应用文本有一个唯一 key，值为各语言的翻译映射
 const translations: TranslationMap = {
   'app.name': {
     'zh-CN': '文章阅读',
@@ -260,11 +274,21 @@ const translations: TranslationMap = {
   },
 };
 
+/**
+ * 获取当前语言的翻译文本
+ * @param key   翻译 key，对应 translations 中的键
+ * @param params  可选参数，用于替换文本中的 {param} 占位符
+ * @returns 翻译后的文本，未找到时回退到 key 本身或简体中文
+ */
 export function t(key: string, params?: Record<string, string | number>): string {
+  // 从 zustand store 中读取当前语言（非响应式，直接 getState）
   const lang = useSettingsStore.getState().language;
   const entry = translations[key];
+  // 未找到翻译条目时返回原始 key
   if (!entry) return key;
+  // 回退顺序：当前语言 → 简体中文 → 原始 key
   let text = entry[lang] || entry['zh-CN'] || key;
+  // 替换 {param} 占位符
   if (params) {
     Object.entries(params).forEach(([k, v]) => {
       text = text.replace(`{${k}}`, String(v));

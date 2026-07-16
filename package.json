@@ -1,4 +1,5 @@
 {
+  "//": "文章阅读 - Bun Monorepo 根配置。使用 workspaces 管理 packages/ 下的前后端子包。",
   "name": "article-reader",
   "version": "1.0.0",
   "private": true,

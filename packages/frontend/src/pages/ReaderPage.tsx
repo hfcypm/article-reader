@@ -9,11 +9,23 @@ import { getSentenceDuration, SPEED_OPTIONS, type SpeedOption } from '@/lib/util
 import { useSettingsStore, type FontSize, type Theme } from '@/store/settingsStore';
 import type { Document } from '@/types';
 
+/**
+ * 判断文本是否主要为中文，用于 TTS 朗读时选择正确的语言
+ * @param text 待检测的文本
+ * @returns 中文占比超过 30% 返回 true
+ */
 function isChineseText(text: string): boolean {
   const chineseChars = (text.match(/[\u4e00-\u9fff]/g) || []).length;
   return chineseChars > text.replace(/[\u4e00-\u9fff]/g, '').length * 0.3;
 }
 
+/**
+ * 使用浏览器 Web Speech API 朗读文本
+ * @param text 要朗读的文本
+ * @param rate 朗读速率
+ * @param onEnd 朗读完成后的回调
+ * @returns 创建的 utterance 对象，供后续取消使用
+ */
 function speakText(text: string, rate: number, onEnd: () => void) {
   if (!('speechSynthesis' in window)) return null;
 
@@ -29,32 +41,51 @@ function speakText(text: string, rate: number, onEnd: () => void) {
   return utterance;
 }
 
+/**
+ * 阅读器页面 - 逐句阅读文档，支持速度调节、字号/主题设置、语音朗读、进度拖拽
+ */
 export function ReaderPage() {
   const { docId } = useParams<{ docId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
   const settings = useSettingsStore();
+  /** 当前文档数据 */
   const [doc, setDoc] = useState<Document | null>(null);
+  /** 当前句子索引 */
   const [currentIndex, setCurrentIndex] = useState(0);
+  /** 是否正在播放 */
   const [isPlaying, setIsPlaying] = useState(false);
+  /** 当前播放速度 */
   const [speed, setSpeed] = useState<SpeedOption>(
     (location.state as { speed?: SpeedOption })?.speed || settings.defaultSpeed
   );
+  /** 文档加载中 */
   const [loading, setLoading] = useState(true);
+  /** 当前字体大小 */
   const [fontSize, setFontSize] = useState(settings.fontSize);
+  /** 当前主题（亮色/暗色） */
   const [theme, setTheme] = useState<Theme>(settings.theme);
+  /** 语音朗读开关 */
   const [ttsEnabled, setTtsEnabled] = useState(settings.ttsEnabled);
+  /** 速度选择菜单是否展开 */
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  /** 阅读设置弹窗是否展开 */
   const [showSettings, setShowSettings] = useState(false);
+  /** 是否正在拖拽进度条 */
   const [isDragging, setIsDragging] = useState(false);
+  /** 自动翻页定时器引用 */
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** TTS 朗读对象引用 */
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  /** 进度条 DOM 引用 */
   const progressBarRef = useRef<HTMLDivElement>(null);
 
+  /** 路由参数变化时加载文档 */
   useEffect(() => {
     if (docId) loadDocument(docId);
   }, [docId]);
 
+  /** 加载文档内容并恢复上次阅读位置 */
   const loadDocument = async (id: string) => {
     setLoading(true);
     const res = await api.get<Document>(`/documents/${id}`);
@@ -68,6 +99,7 @@ export function ReaderPage() {
     setLoading(false);
   };
 
+  /** 组件卸载时清理定时器和语音朗读 */
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -75,6 +107,7 @@ export function ReaderPage() {
     };
   }, []);
 
+  /** 播放控制 - 每隔句子时长自动翻到下一句，支持 TTS 模式 */
   useEffect(() => {
     if (!isPlaying || !doc) return;
 
@@ -121,23 +154,27 @@ export function ReaderPage() {
     };
   }, [isPlaying, currentIndex, speed, doc, ttsEnabled]);
 
+  /** 持久化保存阅读进度到后端 */
   const saveProgress = useCallback(async () => {
     if (!docId) return;
     await api.put(`/bookshelf/${docId}/progress`, { currentSentence: currentIndex });
   }, [docId, currentIndex]);
 
+  /** 页面卸载/关闭前自动保存阅读进度 */
   useEffect(() => {
     const handleBeforeUnload = () => saveProgress();
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [saveProgress]);
 
+  /** 返回上一页并保存进度 */
   const handleBack = () => {
     window.speechSynthesis?.cancel();
     saveProgress();
     navigate(-1);
   };
 
+  /** 播放/暂停切换 */
   const handlePlayPause = () => {
     if (isPlaying) {
       window.speechSynthesis?.cancel();
@@ -145,6 +182,7 @@ export function ReaderPage() {
     setIsPlaying(!isPlaying);
   };
 
+  /** 跳转到下一句 */
   const handleNext = () => {
     window.speechSynthesis?.cancel();
     const sentences = ((doc?.sentences as unknown[]) || []) as { text: string }[];
@@ -154,6 +192,7 @@ export function ReaderPage() {
     }
   };
 
+  /** 跳转到上一句 */
   const handlePrev = () => {
     window.speechSynthesis?.cancel();
     if (currentIndex > 0) {
@@ -162,6 +201,7 @@ export function ReaderPage() {
     }
   };
 
+  /** 根据鼠标/触摸横坐标定位到进度条对应的句子 */
   const seekToPosition = useCallback((clientX: number) => {
     if (!doc) return;
     const sentences = ((doc.sentences as unknown[]) || []) as { text: string }[];
@@ -174,6 +214,7 @@ export function ReaderPage() {
     setIsPlaying(false);
   }, [doc]);
 
+  /** 拖拽开始事件处理 */
   const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     window.speechSynthesis?.cancel();
     setIsDragging(true);
@@ -181,17 +222,19 @@ export function ReaderPage() {
     seekToPosition(clientX);
   }, [seekToPosition]);
 
+  /** 拖拽移动事件处理 */
   const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
     const clientX = 'touches' in e ? (e as TouchEvent).touches[0].clientX : (e as MouseEvent).clientX;
     seekToPosition(clientX);
   }, [seekToPosition]);
 
+  /** 拖拽结束事件处理 */
   const handleDragEnd = useCallback(() => {
     setIsDragging(false);
   }, []);
 
+  /** 拖拽时绑定全局鼠标/触摸事件 */
   useEffect(() => {
-    if (!isDragging) return;
     document.addEventListener('mousemove', handleDragMove);
     document.addEventListener('mouseup', handleDragEnd);
     document.addEventListener('touchmove', handleDragMove, { passive: true });
@@ -204,6 +247,7 @@ export function ReaderPage() {
     };
   }, [isDragging, handleDragMove, handleDragEnd]);
 
+  /** 点击进度条直接跳转到对应句子 */
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
     window.speechSynthesis?.cancel();
     if (!doc) return;
@@ -215,6 +259,7 @@ export function ReaderPage() {
     setIsPlaying(false);
   };
 
+  /** 字体大小对应的 Tailwind CSS 类名映射 */
   const fontSizes: Record<FontSize, string> = {
     small: 'text-xl leading-relaxed',
     medium: 'text-2xl leading-relaxed',
@@ -224,6 +269,7 @@ export function ReaderPage() {
 
   if (loading) {
     return (
+      /* 加载中状态 */
       <div className="h-full flex items-center justify-center bg-surface">
         <span className="text-text-muted text-sm">加载中...</span>
       </div>
@@ -232,6 +278,7 @@ export function ReaderPage() {
 
   if (!doc) {
     return (
+      /* 文档不存在状态 */
       <div className="h-full flex flex-col items-center justify-center bg-surface gap-4">
         <p className="text-text-muted">文档不存在</p>
         <Button onClick={() => navigate('/')}>返回首页</Button>
@@ -247,6 +294,7 @@ export function ReaderPage() {
     <div
       className={`h-full flex flex-col ${theme === 'dark' ? 'bg-surface-dark text-text-dark' : 'bg-surface text-text'}`}
     >
+      {/* 顶部导航栏 - 标题、返回按钮、设置入口 */}
       <Header
         title={doc.title}
         showBack
@@ -266,6 +314,7 @@ export function ReaderPage() {
       <div className="flex-1 flex flex-col items-center justify-center px-8 overflow-hidden">
         <div className="flex-1 flex flex-col items-center justify-center w-full max-h-full">
           {currentIndex > 0 && (
+            /* 上一句文本预览（半透明） */
             <div className="mb-8 w-full text-center">
               <p className="text-sm text-text-muted/60 line-clamp-2">
                 {sentences[currentIndex - 1]?.text || ''}
@@ -273,6 +322,7 @@ export function ReaderPage() {
             </div>
           )}
 
+          {/* 当前句子显示区域 */}
           <div className="flex-1 flex items-center justify-center min-h-[120px] max-h-[50vh] overflow-y-auto w-full">
             <p
               className={`reader-sentence active font-bold text-center w-full ${fontSizes[fontSize]} ${theme === 'dark' ? 'text-text-dark' : 'text-text'}`}
@@ -282,6 +332,7 @@ export function ReaderPage() {
           </div>
 
           {currentIndex < sentences.length - 1 && (
+            /* 下一句文本预览（半透明） */
             <div className="mt-8 w-full text-center">
               <p className="text-sm text-text-muted/40 line-clamp-2">
                 {sentences[currentIndex + 1]?.text || ''}
@@ -290,6 +341,7 @@ export function ReaderPage() {
           )}
         </div>
 
+        {/* 进度条区域 */}
         <div className="w-full mb-5">
           <div
             ref={progressBarRef}
@@ -319,7 +371,9 @@ export function ReaderPage() {
       </div>
 
       <div className={`p-5 pb-10 border-t ${theme === 'dark' ? 'border-border-dark' : 'border-border'}`}>
+        {/* 播放控制按钮区域 */}
         <div className="flex items-center justify-center gap-8">
+          {/* 上一句按钮 */}
           <button
             onClick={handlePrev}
             disabled={currentIndex === 0}
@@ -331,6 +385,7 @@ export function ReaderPage() {
             </svg>
           </button>
 
+          {/* 播放/暂停按钮 */}
           <button
             onClick={handlePlayPause}
             className="w-16 h-16 flex items-center justify-center rounded-full bg-primary text-white shadow-lg shadow-primary/30 hover:bg-primary-dark transition-all active:scale-95"
@@ -347,6 +402,7 @@ export function ReaderPage() {
             )}
           </button>
 
+          {/* 下一句按钮 */}
           <button
             onClick={handleNext}
             disabled={currentIndex >= sentences.length - 1}
@@ -359,7 +415,9 @@ export function ReaderPage() {
           </button>
         </div>
 
+        {/* 辅助工具栏 - 播放速度与语音朗读设置 */}
         <div className="flex items-center justify-center gap-3 mt-5">
+          {/* 播放速度按钮 */}
           <button
             onClick={() => setShowSpeedMenu(true)}
             className="text-xs font-medium px-3 py-1.5 rounded-full bg-surface-card text-text-muted hover:text-text transition-colors"
@@ -367,6 +425,7 @@ export function ReaderPage() {
             {speed}x
           </button>
 
+          {/* 语音朗读开关按钮 */}
           {'speechSynthesis' in window && (
             <button
               onClick={() => setTtsEnabled(!ttsEnabled)}
@@ -396,6 +455,7 @@ export function ReaderPage() {
         </div>
       </div>
 
+      {/* 播放速度选择弹窗 */}
       <Dialog open={showSpeedMenu} onClose={() => setShowSpeedMenu(false)} title="播放速度">
         <div className="space-y-1">
           {SPEED_OPTIONS.map((s) => (
@@ -412,6 +472,7 @@ export function ReaderPage() {
         </div>
       </Dialog>
 
+      {/* 阅读设置弹窗 - 字号和主题选择 */}
       <Dialog open={showSettings} onClose={() => setShowSettings(false)} title="阅读设置">
         <div className="space-y-4">
           <div>

@@ -13,20 +13,32 @@ import { t } from '@/lib/i18n';
 import { useLongPress } from '@/lib/useLongPress';
 import type { BookshelfItem, SortBy } from '@/types';
 
+/**
+ * 书架页面 - 展示已加入书架的所有文档，支持搜索、排序和移除操作
+ */
 export function BookshelfPage() {
+  /** 书架中的所有文档列表 */
   const [items, setItems] = useState<BookshelfItem[]>([]);
+  /** 数据加载中标记 */
   const [loading, setLoading] = useState(true);
+  /** 当前排序方式 */
   const [sortBy, setSortBy] = useState<SortBy>('lastReadAt');
+  /** 搜索关键词 */
   const [searchQuery, setSearchQuery] = useState('');
+  /** 搜索进行中标记 */
   const [searching, setSearching] = useState(false);
+  /** 待删除的文档项 */
   const [deleteTarget, setDeleteTarget] = useState<BookshelfItem | null>(null);
+  /** 删除操作进行中标记 */
   const [deleting, setDeleting] = useState(false);
   const navigate = useNavigate();
 
+  /** 排序方式变更时重新加载书架 */
   useEffect(() => {
     loadBookshelf();
   }, [sortBy]);
 
+  /** 从 API 加载书架数据 */
   const loadBookshelf = async () => {
     setLoading(true);
     const res = await api.get<BookshelfItem[]>(`/bookshelf?sortBy=${sortBy}`);
@@ -34,6 +46,7 @@ export function BookshelfPage() {
     setLoading(false);
   };
 
+  /** 根据搜索关键词查询书架 */
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
       loadBookshelf();
@@ -45,6 +58,7 @@ export function BookshelfPage() {
     setSearching(false);
   };
 
+  /** 从书架上移除指定文档 */
   const handleRemove = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -59,6 +73,9 @@ export function BookshelfPage() {
     setDeleteTarget(null);
   };
 
+  /**
+   * 书架卡片子组件 - 展示单本书籍的封面、进度和操作按钮
+   */
   function ShelfCard({ item }: { item: BookshelfItem }) {
     const { handlers } = useLongPress(() => setDeleteTarget(item));
 
@@ -71,12 +88,14 @@ export function BookshelfPage() {
         >
           <Card className="h-full book-card flex flex-col gap-3">
             <div className="flex items-start justify-between">
+              {/* 书籍图标 */}
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
                   <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
                 </svg>
               </div>
+              {/* 长按移除按钮（悬停显示） */}
               <button
                 onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); }}
                 className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-accent-red/10"
@@ -88,12 +107,15 @@ export function BookshelfPage() {
               </button>
             </div>
             <div className="flex-1">
+              {/* 书名 */}
               <p className="text-sm font-medium text-text line-clamp-2 mb-1">{item.title}</p>
+              {/* 格式标签 */}
               <div className="flex items-center gap-1 mb-2">
                 <Badge variant="default" className="!text-[10px]">{item.format.toUpperCase()}</Badge>
               </div>
             </div>
             <div>
+              {/* 阅读进度条 */}
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[10px] text-text-muted">进度</span>
                 <span className="text-[10px] text-primary font-medium">{Math.round(item.progress * 100)}%</span>
@@ -103,6 +125,7 @@ export function BookshelfPage() {
               </div>
             </div>
             {item.currentSentence > 0 && (
+              /* 继续阅读按钮（有阅读进度时显示） */
               <Button
                 variant="outline"
                 size="sm"
@@ -118,6 +141,7 @@ export function BookshelfPage() {
     );
   }
 
+  /** 排序方式选项 */
   const sortOptions: { key: SortBy; label: string }[] = [
     { key: 'lastReadAt', label: '最近阅读' },
     { key: 'addedAt', label: '加入时间' },
@@ -127,8 +151,10 @@ export function BookshelfPage() {
   return (
     <div className="page">
       <div className="pt-7 pb-10 fade-in">
+        {/* 页面标题 */}
         <h1 className="text-xl font-bold text-text mb-6">{t('bookshelf')}</h1>
 
+        {/* 搜索栏 */}
         <div className="flex gap-2.5 mb-6">
           <Input
             placeholder={t('bookshelf.search')}
@@ -142,6 +168,7 @@ export function BookshelfPage() {
           </Button>
         </div>
 
+        {/* 排序方式切换栏 */}
         <div className="flex gap-1.5 mb-6 p-1 bg-surface rounded-xl">
           {sortOptions.map((opt) => (
             <button
@@ -157,8 +184,10 @@ export function BookshelfPage() {
         </div>
 
         {loading ? (
+          /* 加载中状态 */
           <div className="text-center py-16 text-text-muted text-sm">{t('bookshelf.loading')}</div>
         ) : items.length === 0 ? (
+          /* 书架为空状态 */
           <EmptyState
             icon={
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -173,6 +202,7 @@ export function BookshelfPage() {
             }
           />
         ) : (
+          /* 书架书籍网格 */
           <div className="grid grid-cols-2 gap-4">
             {items.map((item) => (
               <ShelfCard key={item.id} item={item} />
@@ -181,6 +211,7 @@ export function BookshelfPage() {
         )}
       </div>
 
+      {/* 确认移除对话框 */}
       <Dialog
         open={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}

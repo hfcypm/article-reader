@@ -1,69 +1,77 @@
+// Prisma 数据库 Schema 定义
+// 使用 SQLite 作为开发数据库，通过 DATABASE_URL 环境变量配置路径
+// 设计上可通过更换 provider 和 connection string 迁移到 PostgreSQL
+
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client-js" // 生成 TypeScript 类型安全的 ORM 客户端
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"              // 数据库类型：SQLite（可切换为 postgresql）
+  url      = env("DATABASE_URL")   // 数据库连接字符串，从环境变量读取
 }
 
+// 用户表
 model User {
-  id            String          @id @default(cuid())
-  phone         String          @unique
-  nickname      String
-  passwordHash  String          @map("password_hash")
+  id            String          @id @default(cuid())                // 主键，CUID 全局唯一 ID
+  phone         String          @unique                            // 手机号，唯一登录凭证
+  nickname      String                                              // 昵称
+  passwordHash  String          @map("password_hash")              // bcrypt 哈希后的密码
   createdAt     DateTime        @default(now()) @map("created_at")
   updatedAt     DateTime        @updatedAt @map("updated_at")
-  bookshelfItems BookshelfItem[]
-  documents     Document[]
-  settings      UserSettings?
+  bookshelfItems BookshelfItem[]                                    // 一对多：用户的书架条目
+  documents     Document[]                                          // 一对多：用户导入的文档
+  settings      UserSettings?                                       // 一对一：用户偏好设置
 
   @@map("users")
 }
 
+// 文档表
 model Document {
   id         String         @id @default(cuid())
-  userId     String         @map("user_id")
-  title      String
-  format     String
-  wordCount  Int            @default(0) @map("word_count")
-  sentences  String         @default("[]")
-  content    String         @default("")
-  status     String         @default("pending")
-  progress   Int            @default(0)
-  importedAt DateTime       @default(now()) @map("imported_at")
+  userId     String         @map("user_id")                        // 所属用户
+  title      String                                                // 文档标题
+  format     String                                                // 文件格式：txt / pdf / mobi
+  wordCount  Int            @default(0) @map("word_count")         // 总词数
+  sentences  String         @default("[]")                         // JSON 字符串格式的句子数组
+  content    String         @default("")                           // 原始文本内容
+  status     String         @default("pending")                    // 解析状态：pending / parsing / ready / error
+  progress   Int            @default(0)                            // 解析进度百分比
+  importedAt DateTime       @default(now()) @map("imported_at")    // 导入时间
   createdAt  DateTime       @default(now()) @map("created_at")
   updatedAt  DateTime       @updatedAt @map("updated_at")
-  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade) // 级联删除
   bookshelfItems BookshelfItem[]
 
   @@map("documents")
 }
 
+// 书架条目表（用户与文档的多对多关联）
 model BookshelfItem {
   id             String   @id @default(cuid())
   userId         String   @map("user_id")
   docId          String   @map("doc_id")
-  currentSentence Int     @default(0) @map("current_sentence")
-  progress       Float    @default(0)
-  addedAt        DateTime @default(now()) @map("added_at")
-  lastReadAt     DateTime @default(now()) @map("last_read_at")
+  currentSentence Int     @default(0) @map("current_sentence")     // 当前阅读到的句子索引
+  progress       Float    @default(0)                              // 阅读进度（0-1）
+  addedAt        DateTime @default(now()) @map("added_at")         // 加入书架时间
+  lastReadAt     DateTime @default(now()) @map("last_read_at")     // 最后阅读时间
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   document       Document @relation(fields: [docId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, docId])
+  @@unique([userId, docId])                                        // 同一用户不能重复添加同一文档
   @@map("bookshelf_items")
 }
 
+// 用户设置表（与用户一对一）
 model UserSettings {
   id            String   @id @default(cuid())
-  userId        String   @unique @map("user_id")
-  defaultSpeed  Float    @default(1.0) @map("default_speed")
-  fontSize      String   @default("medium") @map("font_size")
-  theme         String   @default("light")
-  ttsEnabled    Boolean  @default(false) @map("tts_enabled")
+  userId        String   @unique @map("user_id")                     // 用户唯一关联
+  defaultSpeed  Float    @default(1.0) @map("default_speed")         // 默认阅读速度（倍率）
+  fontSize      String   @default("medium") @map("font_size")        // 字体大小：small / medium / large / xlarge
+  theme         String   @default("light")                           // 主题：light / dark
+  ttsEnabled    Boolean  @default(false) @map("tts_enabled")         // 是否启用语音朗读
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)

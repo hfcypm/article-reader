@@ -1,3 +1,13 @@
+/**
+ * 注册页面
+ *
+ * 新用户注册，包含字段校验：
+ * - 昵称（必填）
+ * - 手机号（必填，11 位）
+ * - 密码（必填，至少 8 位）
+ * - 确认密码（必须与密码一致）
+ * 注册成功后自动登录并跳转
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -6,13 +16,20 @@ import { useAuthStore } from '@/store/authStore';
 import { showToast } from '@/components/ui/toast';
 
 export function RegisterPage() {
+  // 昵称
   const [nickname, setNickname] = useState('');
+  // 手机号
   const [phone, setPhone] = useState('');
+  // 密码
   const [password, setPassword] = useState('');
+  // 确认密码（二次输入）
   const [confirmPassword, setConfirmPassword] = useState('');
+  // 注册请求进行中
   const [loading, setLoading] = useState(false);
+  // 从 zustand authStore 获取 register 方法
   const register = useAuthStore((s) => s.register);
 
+  // 执行注册：逐项校验 → 调用 authStore.register → 显示结果
   const handleRegister = async () => {
     if (!nickname) { showToast('请输入昵称', 'error'); return; }
     if (!phone) { showToast('请输入手机号', 'error'); return; }

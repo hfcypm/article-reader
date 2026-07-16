@@ -1,3 +1,12 @@
+/**
+ * 个人中心页面
+ *
+ * 展示用户个人信息和统计数据：
+ * - 头像（昵称首字母）、昵称、手机号
+ * - 书架数量、已读句数、已读篇数统计卡片
+ * - 设置/隐私/关于等快捷入口
+ * - 退出登录
+ */
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
@@ -9,21 +18,26 @@ import { t } from '@/lib/i18n';
 import type { UserProfile } from '@/types';
 
 export function ProfilePage() {
+  // 用户个人信息
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  // 加载状态
   const [loading, setLoading] = useState(true);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
 
+  // 组件挂载时加载用户资料
   useEffect(() => {
     loadProfile();
   }, []);
 
+  // 从后端获取用户个人资料
   const loadProfile = async () => {
     const res = await api.get<UserProfile>('/user/profile');
     if (res.success && res.data) setProfile(res.data);
     setLoading(false);
   };
 
+  // 退出登录：清除 auth store 状态并跳转到登录页
   const handleLogout = () => {
     logout();
     navigate('/login');
