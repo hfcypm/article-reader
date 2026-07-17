@@ -12,6 +12,7 @@ import { authRoutes } from './routes/auth';
 import { documentRoutes } from './routes/documents';
 import { bookshelfRoutes } from './routes/bookshelf';
 import { userRoutes } from './routes/user';
+import { startGitPullCron } from './cron/gitPullCron';
 
 const app = new Elysia()
   // 注册 CORS 跨域中间件，允许前端项目跨域访问
@@ -68,5 +69,7 @@ const app = new Elysia()
   .listen(process.env.PORT || 3001);
 
 console.log(`Article Reader API running at http://localhost:${app.server?.port}`);
+
+startGitPullCron();
 
 export type App = typeof app;
