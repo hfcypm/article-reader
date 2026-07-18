@@ -114,13 +114,13 @@ export function ImmersiveReaderPage() {
   const [pageMode, setPageMode] = useState<PageMode>('scroll');
 
   const [currentPage, setCurrentPage] = useState(0);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
+  const [flipOffset, setFlipOffset] = useState(0);
+  const [flipAnimating, setFlipAnimating] = useState(false);
 
   const contentRef = useRef<HTMLDivElement>(null);
-  const touchStartX = useRef(0);
-  const touchStartY = useRef(0);
-  const touchDeltaX = useRef(0);
+  const containerWidth = useRef(0);
+  const isSwiping = useRef(false);
+  const swipeStartX = useRef(0);
 
   useEffect(() => {
     if (docId) loadDocument(docId);
@@ -146,17 +146,21 @@ export function ImmersiveReaderPage() {
   const togglePageMode = () => {
     setPageMode(pageMode === 'scroll' ? 'flip' : 'scroll');
     setCurrentPage(0);
+    setFlipOffset(0);
   };
 
-  const goToPage = useCallback((page: number, direction: 'left' | 'right') => {
-    setIsAnimating(true);
-    setSwipeDirection(direction);
-    setTimeout(() => {
-      setCurrentPage(page);
-      setSwipeDirection(null);
-      setIsAnimating(false);
-    }, 300);
-  }, []);
+  const flipToPage = useCallback((targetPage: number) => {
+    const w = containerWidth.current || 360;
+    setFlipAnimating(true);
+    setFlipOffset(targetPage > currentPage ? -w : w);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setFlipOffset(0);
+        setCurrentPage(targetPage);
+        setTimeout(() => setFlipAnimating(false), 400);
+      });
+    });
+  }, [currentPage]);
 
   const goToNextPage = useCallback(() => {
     if (!doc) return;
@@ -164,43 +168,67 @@ export function ImmersiveReaderPage() {
     const height = contentRef.current?.clientHeight || 600;
     const pages = paginateSentences(sentences, height, fontSize);
     if (currentPage < pages.length - 1) {
-      goToPage(currentPage + 1, 'left');
+      flipToPage(currentPage + 1);
     }
-  }, [doc, currentPage, fontSize, goToPage]);
+  }, [doc, currentPage, fontSize, flipToPage]);
 
   const goToPrevPage = useCallback(() => {
     if (currentPage > 0) {
-      goToPage(currentPage - 1, 'right');
+      flipToPage(currentPage - 1);
     }
-  }, [currentPage, goToPage]);
+  }, [currentPage, flipToPage]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (pageMode !== 'flip' || isAnimating) return;
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-    touchDeltaX.current = 0;
-  }, [pageMode, isAnimating]);
+    if (pageMode !== 'flip' || flipAnimating) return;
+    const touch = e.touches[0];
+    swipeStartX.current = touch.clientX;
+    isSwiping.current = true;
+    setFlipOffset(0);
+  }, [pageMode, flipAnimating]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (pageMode !== 'flip' || isAnimating) return;
-    touchDeltaX.current = e.touches[0].clientX - touchStartX.current;
-  }, [pageMode, isAnimating]);
+    if (!isSwiping.current || flipAnimating) return;
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - swipeStartX.current;
+    containerWidth.current = contentRef.current?.clientWidth || 360;
+
+    const maxOffset = containerWidth.current;
+    const clamped = Math.max(-maxOffset, Math.min(maxOffset, deltaX));
+
+    if (!doc) return;
+    const sentences = ((doc.sentences as unknown[]) || []) as { text: string; index: number }[];
+    const height = contentRef.current?.clientHeight || 600;
+    const pages = paginateSentences(sentences, height, fontSize);
+
+    if ((clamped < 0 && currentPage >= pages.length - 1) ||
+        (clamped > 0 && currentPage <= 0)) {
+      setFlipOffset(clamped * 0.3);
+    } else {
+      setFlipOffset(clamped);
+    }
+  }, [flipAnimating, doc, currentPage, fontSize]);
 
   const handleTouchEnd = useCallback(() => {
-    if (pageMode !== 'flip' || isAnimating) return;
-    const threshold = 60;
-    if (touchDeltaX.current < -threshold) {
+    if (!isSwiping.current) return;
+    isSwiping.current = false;
+
+    const threshold = containerWidth.current * 0.25;
+
+    if (flipOffset < -threshold) {
       goToNextPage();
-    } else if (touchDeltaX.current > threshold) {
+    } else if (flipOffset > threshold) {
       goToPrevPage();
+    } else {
+      setFlipAnimating(true);
+      setFlipOffset(0);
+      setTimeout(() => setFlipAnimating(false), 350);
     }
-    touchDeltaX.current = 0;
-  }, [pageMode, isAnimating, goToNextPage, goToPrevPage]);
+  }, [flipOffset, goToNextPage, goToPrevPage]);
 
   /** 键盘翻页支持 */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (pageMode !== 'flip' || isAnimating) return;
+      if (pageMode !== 'flip' || flipAnimating) return;
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
         goToNextPage();
       } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
@@ -209,7 +237,7 @@ export function ImmersiveReaderPage() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [pageMode, isAnimating, goToNextPage, goToPrevPage]);
+  }, [pageMode, flipAnimating, goToNextPage, goToPrevPage]);
 
   if (loading) {
     return (
@@ -237,6 +265,13 @@ export function ImmersiveReaderPage() {
   const textColor = theme === 'dark' ? 'text-[#e2e8f0]' : 'text-[#2d3436]';
   const borderColor = theme === 'dark' ? 'border-[#334155]' : 'border-[#e2e0dc]';
 
+  const w = containerWidth.current || 360;
+  const flipProgress = w > 0 ? flipOffset / w : 0;
+  const flipAngle = flipProgress * -90;
+  const isFlippingLeft = flipOffset < 0;
+  const isFlippingRight = flipOffset > 0;
+  const isFlipping = isFlippingLeft || isFlippingRight;
+
   return (
     <div className={`h-full flex flex-col relative ${pageBg} ${textColor}`}>
       <Header
@@ -251,76 +286,84 @@ export function ImmersiveReaderPage() {
         <div
           ref={contentRef}
           className="flex-1 relative overflow-hidden select-none"
+          style={{ perspective: '1200px' }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
-          <div className="relative w-full h-full">
-            {pages.map((pageSentences, pageIdx) => {
-              if (Math.abs(pageIdx - currentPage) > 1 && !isAnimating) return null;
+          {/* 底层页面 */}
+          {isFlippingLeft && currentPage < pages.length - 1 && (
+            <div className="absolute inset-0 px-6 py-6 overflow-y-auto" style={{ zIndex: 1 }}>
+              <div className={fontSizes[fontSize]}>
+                {pages[currentPage + 1].map((text, i) => (
+                  <p key={i} className="mb-1 text-justify">{text}</p>
+                ))}
+              </div>
+            </div>
+          )}
+          {isFlippingRight && currentPage > 0 && (
+            <div className="absolute inset-0 px-6 py-6 overflow-y-auto" style={{ zIndex: 1 }}>
+              <div className={fontSizes[fontSize]}>
+                {pages[currentPage - 1].map((text, i) => (
+                  <p key={i} className="mb-1 text-justify">{text}</p>
+                ))}
+              </div>
+            </div>
+          )}
 
-              let transform = 'translateX(0)';
-              let opacity = '0';
-              let zIndex = '0';
-
-              if (isAnimating && swipeDirection === 'left') {
-                if (pageIdx === currentPage) {
-                  transform = 'translateX(-100%)';
-                  opacity = '1';
-                  zIndex = '10';
-                } else if (pageIdx === currentPage + 1) {
-                  transform = 'translateX(0)';
-                  opacity = '1';
-                  zIndex = '20';
-                }
-              } else if (isAnimating && swipeDirection === 'right') {
-                if (pageIdx === currentPage) {
-                  transform = 'translateX(100%)';
-                  opacity = '1';
-                  zIndex = '10';
-                } else if (pageIdx === currentPage - 1) {
-                  transform = 'translateX(0)';
-                  opacity = '1';
-                  zIndex = '20';
-                }
-              } else if (pageIdx === currentPage) {
-                opacity = '1';
-                zIndex = '10';
-              }
-
-              return (
-                <div
-                  key={pageIdx}
-                  className="absolute inset-0 px-6 py-6 overflow-y-auto transition-transform duration-300 ease-out"
-                  style={{ transform, opacity, zIndex }}
-                >
-                  <div className={fontSizes[fontSize]}>
-                    {pageSentences.map((text, i) => (
-                      <p key={i} className="mb-1 text-justify">
-                        {text}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+          {/* 顶层当前页面 - 3D 翻页 */}
+          <div
+            className={`absolute inset-0 px-6 py-6 overflow-y-auto ${pageBg}`}
+            style={{
+              zIndex: 10,
+              transform: `rotateY(${flipAngle}deg)`,
+              transformOrigin: isFlippingLeft ? 'right center' : 'left center',
+              transition: isSwiping.current ? 'none' : 'transform 0.35s ease-out',
+              backfaceVisibility: 'hidden',
+              boxShadow: isFlipping
+                ? `${isFlippingLeft ? '-8px' : '8px'} 0 20px rgba(0,0,0,${Math.abs(flipProgress) * 0.3})`
+                : 'none',
+            }}
+          >
+            <div className={fontSizes[fontSize]}>
+              {pages[currentPage]?.map((text, i) => (
+                <p key={i} className="mb-1 text-justify">{text}</p>
+              ))}
+            </div>
           </div>
 
+          {/* 翻页阴影叠加层 */}
+          {isFlipping && (
+            <div
+              className="absolute inset-y-0 pointer-events-none"
+              style={{
+                zIndex: 15,
+                width: '50%',
+                [isFlippingLeft ? 'right' : 'left']: 0,
+                background: isFlippingLeft
+                  ? `linear-gradient(to left, rgba(0,0,0,${Math.abs(flipProgress) * 0.25}), transparent)`
+                  : `linear-gradient(to right, rgba(0,0,0,${Math.abs(flipProgress) * 0.25}), transparent)`,
+                opacity: isSwiping.current ? 1 : undefined,
+                transition: isSwiping.current ? 'none' : 'opacity 0.35s ease-out',
+              }}
+            />
+          )}
+
           {/* 翻页指示器 */}
-          <div className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none">
+          <div className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none" style={{ zIndex: 20 }}>
             <span className="text-xs text-text-muted/50 bg-surface-card/70 px-3 py-1 rounded-full">
               {currentPage + 1} / {pages.length}
             </span>
           </div>
 
-          {/* 左/右翻页区域按钮（轻触翻页） */}
+          {/* 左/右轻触翻页 */}
           <button
-            className="absolute left-0 top-0 bottom-0 w-[30%] z-30"
-            onClick={goToPrevPage}
+            className="absolute left-0 top-0 bottom-0 w-[25%] z-30"
+            onClick={() => { if (!flipAnimating) goToPrevPage(); }}
           />
           <button
-            className="absolute right-0 top-0 bottom-0 w-[30%] z-30"
-            onClick={goToNextPage}
+            className="absolute right-0 top-0 bottom-0 w-[25%] z-30"
+            onClick={() => { if (!flipAnimating) goToNextPage(); }}
           />
         </div>
       ) : (
