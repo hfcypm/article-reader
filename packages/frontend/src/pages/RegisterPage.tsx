@@ -8,38 +8,42 @@
  * - 确认密码（必须与密码一致）
  * 注册成功后自动登录并跳转
  */
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Captcha } from '@/components/ui/captcha';
 import { useAuthStore } from '@/store/authStore';
 import { showToast } from '@/components/ui/toast';
 
 export function RegisterPage() {
-  // 昵称
   const [nickname, setNickname] = useState('');
-  // 手机号
   const [phone, setPhone] = useState('');
-  // 密码
   const [password, setPassword] = useState('');
-  // 确认密码（二次输入）
   const [confirmPassword, setConfirmPassword] = useState('');
-  // 注册请求进行中
   const [loading, setLoading] = useState(false);
-  // 从 zustand authStore 获取 register 方法
+  const [captchaId, setCaptchaId] = useState('');
+  const [captchaText, setCaptchaText] = useState('');
   const register = useAuthStore((s) => s.register);
 
-  // 执行注册：逐项校验 → 调用 authStore.register → 显示结果
+  const handleCaptchaChange = useCallback((id: string, text: string) => {
+    setCaptchaId(id);
+    setCaptchaText(text);
+  }, []);
+
+  const canSubmit = nickname && phone && password && confirmPassword && captchaText && !loading;
+
   const handleRegister = async () => {
     if (!nickname) { showToast('请输入昵称', 'error'); return; }
     if (!phone) { showToast('请输入手机号', 'error'); return; }
     if (!password) { showToast('请输入密码', 'error'); return; }
     if (password.length < 8) { showToast('密码长度至少8位', 'error'); return; }
     if (password !== confirmPassword) { showToast('两次密码输入不一致', 'error'); return; }
+    if (!captchaText) { showToast('请输入图形验证码', 'error'); return; }
 
     setLoading(true);
     try {
-      await register(phone, password, nickname);
+      await register(phone, password, nickname, captchaId, captchaText);
       showToast('注册成功', 'success');
     } catch (e) {
       showToast((e as Error).message, 'error');
@@ -94,7 +98,9 @@ export function RegisterPage() {
               onChange={(e) => setConfirmPassword(e.target.value)}
             />
 
-            <Button className="w-full" size="lg" onClick={handleRegister} disabled={loading}>
+            <Captcha onCaptchaChange={handleCaptchaChange} />
+
+            <Button className="w-full" size="lg" onClick={handleRegister} disabled={!canSubmit}>
               {loading ? '注册中...' : '注册'}
             </Button>
 

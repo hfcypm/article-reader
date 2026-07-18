@@ -6,36 +6,41 @@
  * - 验证码登录：手机号 + 验证码
  * 登录成功后自动跳转到首页
  */
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Captcha } from '@/components/ui/captcha';
 import { useAuthStore } from '@/store/authStore';
 import { showToast } from '@/components/ui/toast';
 
 export function LoginPage() {
-  // 手机号
   const [phone, setPhone] = useState('');
-  // 密码
   const [password, setPassword] = useState('');
-  // 验证码
   const [code, setCode] = useState('');
-  // 登录模式：password（密码）或 code（验证码）
   const [mode, setMode] = useState<'password' | 'code'>('password');
-  // 登录请求进行中
   const [loading, setLoading] = useState(false);
-  // 从 zustand authStore 获取 login 方法
+  const [captchaId, setCaptchaId] = useState('');
+  const [captchaText, setCaptchaText] = useState('');
   const login = useAuthStore((s) => s.login);
 
-  // 执行登录：校验字段 → 调用 authStore.login → 显示结果
+  const handleCaptchaChange = useCallback((id: string, text: string) => {
+    setCaptchaId(id);
+    setCaptchaText(text);
+  }, []);
+
+  const credentialFilled = mode === 'password' ? password : code;
+  const canSubmit = phone && credentialFilled && captchaText && !loading;
+
   const handleLogin = async () => {
     if (!phone) { showToast('请输入手机号', 'error'); return; }
     if (mode === 'password' && !password) { showToast('请输入密码', 'error'); return; }
     if (mode === 'code' && !code) { showToast('请输入验证码', 'error'); return; }
+    if (!captchaText) { showToast('请输入图形验证码', 'error'); return; }
 
     setLoading(true);
     try {
-      await login(phone, mode === 'password' ? password : undefined, mode === 'code' ? code : undefined);
+      await login(phone, captchaId, captchaText, mode === 'password' ? password : undefined, mode === 'code' ? code : undefined);
       showToast('登录成功', 'success');
     } catch (e) {
       showToast((e as Error).message, 'error');
@@ -89,6 +94,8 @@ export function LoginPage() {
               />
             )}
 
+            <Captcha onCaptchaChange={handleCaptchaChange} />
+
             <div className="flex justify-end">
               <button
                 className="text-xs text-primary hover:underline"
@@ -98,7 +105,7 @@ export function LoginPage() {
               </button>
             </div>
 
-            <Button className="w-full" size="lg" onClick={handleLogin} disabled={loading}>
+            <Button className="w-full" size="lg" onClick={handleLogin} disabled={!canSubmit}>
               {loading ? '登录中...' : '登录'}
             </Button>
 

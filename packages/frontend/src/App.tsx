@@ -8,6 +8,7 @@ import { useEffect } from 'react';
 import { useAuthStore } from './store/authStore';
 import { useSettingsStore } from './store/settingsStore';
 import { MainLayout } from './components/layout/MainLayout';
+import { ToastContainer } from './components/ui/toast';
 import { HomePage } from './pages/HomePage';
 import { BookshelfPage } from './pages/BookshelfPage';
 import { ProfilePage } from './pages/ProfilePage';
@@ -77,17 +78,20 @@ export default function App() {
   // 路由配置：登录/注册页在未登录时展示，已登录时重定向到首页
   // 受保护页面嵌套在 MainLayout 中（底部 Tab 栏）
   return (
-    <Routes>
-      <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
-      <Route path="/register" element={isAuthenticated ? <Navigate to="/" replace /> : <RegisterPage />} />
-      <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-        <Route index element={<HomePage />} />
-        <Route path="bookshelf" element={<BookshelfPage />} />
-        <Route path="profile" element={<ProfilePage />} />
-      </Route>
-      <Route path="/detail/:docId" element={<ProtectedRoute><DetailPage /></ProtectedRoute>} />
-      <Route path="/reader/:docId" element={<ProtectedRoute><ReaderPage /></ProtectedRoute>} />
-      <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
+        <Route path="/register" element={isAuthenticated ? <Navigate to="/" replace /> : <RegisterPage />} />
+        <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+          <Route index element={<HomePage />} />
+          <Route path="bookshelf" element={<BookshelfPage />} />
+          <Route path="profile" element={<ProfilePage />} />
+        </Route>
+        <Route path="/detail/:docId" element={<ProtectedRoute><DetailPage /></ProtectedRoute>} />
+        <Route path="/reader/:docId" element={<ProtectedRoute><ReaderPage /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+      </Routes>
+      <ToastContainer />
+    </>
   );
 }

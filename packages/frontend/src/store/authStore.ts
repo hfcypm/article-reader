@@ -13,9 +13,9 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   /** 登录：支持密码或验证码两种方式 */
-  login: (phone: string, password?: string, code?: string) => Promise<void>;
+  login: (phone: string, captchaId: string, captchaText: string, password?: string, code?: string) => Promise<void>;
   /** 用户注册 */
-  register: (phone: string, password: string, nickname: string) => Promise<void>;
+  register: (phone: string, password: string, nickname: string, captchaId: string, captchaText: string) => Promise<void>;
   /** 登出 */
   logout: () => void;
   /** 检查本地 token 是否存在以恢复登录态 */
@@ -31,8 +31,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
   isLoading: true,
 
-  login: async (phone, password, code) => {
-    const body: Record<string, string> = { phone };
+  login: async (phone, captchaId, captchaText, password, code) => {
+    const body: Record<string, string> = { phone, captchaId, captchaText };
     if (code) body.code = code;
     if (password) body.password = password;
     const res = await api.post<{ user: User; token: string }>('/auth/login', body);
@@ -41,8 +41,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user: res.data.user, isAuthenticated: true });
   },
 
-  register: async (phone, password, nickname) => {
-    const res = await api.post<{ user: User; token: string }>('/auth/register', { phone, password, nickname });
+  register: async (phone, password, nickname, captchaId, captchaText) => {
+    const res = await api.post<{ user: User; token: string }>('/auth/register', { phone, password, nickname, captchaId, captchaText });
     if (!res.success || !res.data) throw new Error(res.error || '注册失败');
     setToken(res.data.token);
     set({ user: res.data.user, isAuthenticated: true });

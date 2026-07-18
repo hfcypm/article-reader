@@ -5,12 +5,7 @@
 
 import { Outlet } from 'react-router-dom';
 import { TabBar } from './TabBar';
-import { ToastContainer } from '../ui/toast';
 
-/**
- * MainLayout — 应用主框架
- * 作为受保护路由的父级布局，嵌套子路由内容并挂载全局 UI 元素
- */
 export function MainLayout() {
   return (
     <div className="h-full flex flex-col">
@@ -18,7 +13,6 @@ export function MainLayout() {
         <Outlet />
       </div>
       <TabBar />
-      <ToastContainer />
     </div>
   );
 }
