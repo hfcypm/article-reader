@@ -116,10 +116,10 @@ export function ImmersiveReaderPage() {
   const [currentPage, setCurrentPage] = useState(0);
   const [flipOffset, setFlipOffset] = useState(0);
   const [flipAnimating, setFlipAnimating] = useState(false);
+  const [isUserSwiping, setIsUserSwiping] = useState(false);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const containerWidth = useRef(0);
-  const isSwiping = useRef(false);
   const swipeStartX = useRef(0);
 
   useEffect(() => {
@@ -182,12 +182,12 @@ export function ImmersiveReaderPage() {
     if (pageMode !== 'flip' || flipAnimating) return;
     const touch = e.touches[0];
     swipeStartX.current = touch.clientX;
-    isSwiping.current = true;
+    setIsUserSwiping(true);
     setFlipOffset(0);
   }, [pageMode, flipAnimating]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isSwiping.current || flipAnimating) return;
+    if (!isUserSwiping || flipAnimating) return;
     const touch = e.touches[0];
     const deltaX = touch.clientX - swipeStartX.current;
     containerWidth.current = contentRef.current?.clientWidth || 360;
@@ -206,11 +206,11 @@ export function ImmersiveReaderPage() {
     } else {
       setFlipOffset(clamped);
     }
-  }, [flipAnimating, doc, currentPage, fontSize]);
+  }, [isUserSwiping, flipAnimating, doc, currentPage, fontSize]);
 
   const handleTouchEnd = useCallback(() => {
-    if (!isSwiping.current) return;
-    isSwiping.current = false;
+    if (!isUserSwiping) return;
+    setIsUserSwiping(false);
 
     const threshold = containerWidth.current * 0.25;
 
@@ -223,7 +223,7 @@ export function ImmersiveReaderPage() {
       setFlipOffset(0);
       setTimeout(() => setFlipAnimating(false), 350);
     }
-  }, [flipOffset, goToNextPage, goToPrevPage]);
+  }, [isUserSwiping, flipOffset, goToNextPage, goToPrevPage]);
 
   /** 键盘翻页支持 */
   useEffect(() => {
@@ -262,15 +262,19 @@ export function ImmersiveReaderPage() {
   const pageText = pages.map((p) => p.join(''));
 
   const pageBg = theme === 'dark' ? 'bg-[#1a1a2e]' : 'bg-[#f5f0eb]';
+  const pageBgRaw = theme === 'dark' ? '#1a1a2e' : '#f5f0eb';
   const textColor = theme === 'dark' ? 'text-[#e2e8f0]' : 'text-[#2d3436]';
   const borderColor = theme === 'dark' ? 'border-[#334155]' : 'border-[#e2e0dc]';
 
   const w = containerWidth.current || 360;
   const flipProgress = w > 0 ? flipOffset / w : 0;
-  const flipAngle = flipProgress * -90;
-  const isFlippingLeft = flipOffset < 0;
-  const isFlippingRight = flipOffset > 0;
-  const isFlipping = isFlippingLeft || isFlippingRight;
+  const absProgress = Math.abs(flipProgress);
+  const isForward = flipOffset < 0;
+  const isBackward = flipOffset > 0;
+  const isFlipping = isForward || isBackward;
+
+  const useTransition = !isUserSwiping && (flipAnimating || flipOffset === 0);
+  const transitionStyle = useTransition ? 'transform 0.35s cubic-bezier(0.2, 0.1, 0.05, 1)' : 'none';
 
   return (
     <div className={`h-full flex flex-col relative ${pageBg} ${textColor}`}>
@@ -286,71 +290,135 @@ export function ImmersiveReaderPage() {
         <div
           ref={contentRef}
           className="flex-1 relative overflow-hidden select-none"
-          style={{ perspective: '1200px' }}
+          style={{ perspective: '1000px' }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
-          {/* 底层页面 */}
-          {isFlippingLeft && currentPage < pages.length - 1 && (
-            <div className="absolute inset-0 px-6 py-6 overflow-y-auto" style={{ zIndex: 1 }}>
+          {/* 下层页面 + 折叠线投影 */}
+          {isForward && currentPage < pages.length - 1 && (
+            <div className="absolute inset-0 px-6 py-6 overflow-y-auto" style={{ zIndex: 1, backgroundColor: pageBgRaw }}>
               <div className={fontSizes[fontSize]}>
                 {pages[currentPage + 1].map((text, i) => (
                   <p key={i} className="mb-1 text-justify">{text}</p>
                 ))}
               </div>
+              <div
+                className="absolute top-0 bottom-0 pointer-events-none"
+                style={{
+                  right: 0,
+                  width: `${40 + absProgress * 40}px`,
+                  background: `linear-gradient(to left, rgba(0,0,0,${0.08 + absProgress * 0.12}), transparent)`,
+                }}
+              />
             </div>
           )}
-          {isFlippingRight && currentPage > 0 && (
-            <div className="absolute inset-0 px-6 py-6 overflow-y-auto" style={{ zIndex: 1 }}>
+          {isBackward && currentPage > 0 && (
+            <div className="absolute inset-0 px-6 py-6 overflow-y-auto" style={{ zIndex: 1, backgroundColor: pageBgRaw }}>
               <div className={fontSizes[fontSize]}>
-                {pages[currentPage - 1].map((text, i) => (
+                {pages[currentPage].map((text, i) => (
+                  <p key={i} className="mb-1 text-justify">{text}</p>
+                ))}
+              </div>
+              <div
+                className="absolute top-0 bottom-0 pointer-events-none"
+                style={{
+                  left: 0,
+                  width: `${40 + absProgress * 40}px`,
+                  background: `linear-gradient(to right, rgba(0,0,0,${0.08 + absProgress * 0.12}), transparent)`,
+                }}
+              />
+            </div>
+          )}
+
+          {/* 翻起的页面（当前页或前一页） */}
+          {isFlipping && (
+            <div
+              className="absolute inset-0"
+              style={{
+                zIndex: 10,
+                transformStyle: 'preserve-3d',
+                transform: isForward
+                  ? `rotateY(${-absProgress * 90}deg)`
+                  : `rotateY(${(1 - absProgress) * 90}deg)`,
+                transformOrigin: isForward ? 'right center' : 'left center',
+                transition: transitionStyle,
+                backfaceVisibility: 'hidden',
+              }}
+            >
+              <div
+                className="absolute inset-0 px-6 py-6 overflow-y-auto"
+                style={{ backgroundColor: pageBgRaw, backfaceVisibility: 'hidden' }}
+              >
+                <div className={fontSizes[fontSize]}>
+                  {isForward
+                    ? pages[currentPage]?.map((text, i) => (
+                        <p key={i} className="mb-1 text-justify">{text}</p>
+                      ))
+                    : pages[currentPage - 1]?.map((text, i) => (
+                        <p key={i} className="mb-1 text-justify">{text}</p>
+                      ))
+                  }
+                </div>
+              </div>
+
+              {/* 卷曲内侧阴影 - 模拟纸张弯曲折痕 */}
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background: isForward
+                    ? `linear-gradient(to right, rgba(0,0,0,${0.04 + absProgress * 0.08}) 0%, rgba(0,0,0,${absProgress * 0.02}) 30%, transparent 60%)`
+                    : `linear-gradient(to left, rgba(0,0,0,${0.04 + absProgress * 0.08}) 0%, rgba(0,0,0,${absProgress * 0.02}) 30%, transparent 60%)`,
+                }}
+              />
+
+              {/* 翻起页外侧边缘阴影 */}
+              <div
+                className="absolute top-0 bottom-0 pointer-events-none"
+                style={{
+                  [isForward ? 'right' : 'left']: 0,
+                  width: '20px',
+                  background: isForward
+                    ? `linear-gradient(to left, rgba(0,0,0,${0.06 + absProgress * 0.1}), transparent)`
+                    : `linear-gradient(to right, rgba(0,0,0,${0.06 + absProgress * 0.1}), transparent)`,
+                }}
+              />
+            </div>
+          )}
+
+          {/* 未在翻页时显示正常当前页 */}
+          {!isFlipping && (
+            <div className="absolute inset-0 px-6 py-6 overflow-y-auto" style={{ zIndex: 10, backgroundColor: pageBgRaw }}>
+              <div className={fontSizes[fontSize]}>
+                {pages[currentPage]?.map((text, i) => (
                   <p key={i} className="mb-1 text-justify">{text}</p>
                 ))}
               </div>
             </div>
           )}
 
-          {/* 顶层当前页面 - 3D 翻页 */}
-          <div
-            className={`absolute inset-0 px-6 py-6 overflow-y-auto ${pageBg}`}
-            style={{
-              zIndex: 10,
-              transform: `rotateY(${flipAngle}deg)`,
-              transformOrigin: isFlippingLeft ? 'right center' : 'left center',
-              transition: isSwiping.current ? 'none' : 'transform 0.35s ease-out',
-              backfaceVisibility: 'hidden',
-              boxShadow: isFlipping
-                ? `${isFlippingLeft ? '-8px' : '8px'} 0 20px rgba(0,0,0,${Math.abs(flipProgress) * 0.3})`
-                : 'none',
-            }}
-          >
-            <div className={fontSizes[fontSize]}>
-              {pages[currentPage]?.map((text, i) => (
-                <p key={i} className="mb-1 text-justify">{text}</p>
-              ))}
-            </div>
-          </div>
-
-          {/* 翻页阴影叠加层 */}
-          {isFlipping && (
+          {/* 折叠线 - 模拟纸张厚度 */}
+          {isFlipping && absProgress > 0.05 && (
             <div
-              className="absolute inset-y-0 pointer-events-none"
+              className="absolute top-0 bottom-0 pointer-events-none"
               style={{
-                zIndex: 15,
-                width: '50%',
-                [isFlippingLeft ? 'right' : 'left']: 0,
-                background: isFlippingLeft
-                  ? `linear-gradient(to left, rgba(0,0,0,${Math.abs(flipProgress) * 0.25}), transparent)`
-                  : `linear-gradient(to right, rgba(0,0,0,${Math.abs(flipProgress) * 0.25}), transparent)`,
-                opacity: isSwiping.current ? 1 : undefined,
-                transition: isSwiping.current ? 'none' : 'opacity 0.35s ease-out',
+                zIndex: 20,
+                [isForward ? 'right' : 'left']: isForward
+                  ? `${(1 - absProgress) * 100}%`
+                  : `${absProgress * 100}%`,
+                width: '2px',
+                marginLeft: isForward ? '-1px' : '-1px',
+                background: `rgba(0,0,0,${0.05 + absProgress * 0.08})`,
+                boxShadow: isForward
+                  ? `-1px 0 3px rgba(0,0,0,${absProgress * 0.1})`
+                  : `1px 0 3px rgba(0,0,0,${absProgress * 0.1})`,
+                transition: 'none',
               }}
             />
           )}
 
           {/* 翻页指示器 */}
-          <div className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none" style={{ zIndex: 20 }}>
+          <div className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none" style={{ zIndex: 30 }}>
             <span className="text-xs text-text-muted/50 bg-surface-card/70 px-3 py-1 rounded-full">
               {currentPage + 1} / {pages.length}
             </span>
@@ -359,11 +427,11 @@ export function ImmersiveReaderPage() {
           {/* 左/右轻触翻页 */}
           <button
             className="absolute left-0 top-0 bottom-0 w-[25%] z-30"
-            onClick={() => { if (!flipAnimating) goToPrevPage(); }}
+            onClick={() => { if (!flipAnimating && !isUserSwiping) goToPrevPage(); }}
           />
           <button
             className="absolute right-0 top-0 bottom-0 w-[25%] z-30"
-            onClick={() => { if (!flipAnimating) goToNextPage(); }}
+            onClick={() => { if (!flipAnimating && !isUserSwiping) goToNextPage(); }}
           />
         </div>
       ) : (
