@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { api } from '@/lib/api';
@@ -54,6 +54,51 @@ const FONT_SIZE_LABELS: { key: FontSize; label: string }[] = [
   { key: 'xlarge', label: '特大' },
 ];
 
+type PageMode = 'scroll' | 'flip';
+
+/**
+ * 将句子按可视区域高度分页，每页填满后开始新页
+ */
+function paginateSentences(
+  sentences: { text: string; index: number }[],
+  containerHeight: number,
+  fontSize: FontSize,
+): string[][] {
+  if (!containerHeight || sentences.length === 0) return [[]];
+
+  const lineHeightMap: Record<FontSize, number> = {
+    small: 26,
+    medium: 30,
+    large: 36,
+    xlarge: 42,
+  };
+  const lineHeight = lineHeightMap[fontSize];
+  const padding = 48;
+  const availableHeight = containerHeight - padding;
+  const maxLinesPerPage = Math.max(1, Math.floor(availableHeight / lineHeight));
+  const avgCharsPerLine = Math.max(20, Math.floor(400 / (lineHeight / 28)));
+  const avgCharsPerPage = maxLinesPerPage * avgCharsPerLine;
+
+  const pages: string[][] = [];
+  let currentPage: string[] = [];
+  let currentCharCount = 0;
+
+  for (const s of sentences) {
+    if (currentCharCount + s.text.length > avgCharsPerPage && currentPage.length > 0) {
+      pages.push(currentPage);
+      currentPage = [];
+      currentCharCount = 0;
+    }
+    currentPage.push(s.text);
+    currentCharCount += s.text.length;
+  }
+  if (currentPage.length > 0) {
+    pages.push(currentPage);
+  }
+
+  return pages;
+}
+
 export function ImmersiveReaderPage() {
   const { docId } = useParams<{ docId: string }>();
   const navigate = useNavigate();
@@ -66,6 +111,16 @@ export function ImmersiveReaderPage() {
   const [showToc, setShowToc] = useState(false);
   const [showIntro, setShowIntro] = useState(false);
   const [showFontSize, setShowFontSize] = useState(false);
+  const [pageMode, setPageMode] = useState<PageMode>('scroll');
+
+  const [currentPage, setCurrentPage] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
+
+  const contentRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const touchDeltaX = useRef(0);
 
   useEffect(() => {
     if (docId) loadDocument(docId);
@@ -88,6 +143,74 @@ export function ImmersiveReaderPage() {
     setTheme(theme === 'light' ? 'dark' : 'light');
   };
 
+  const togglePageMode = () => {
+    setPageMode(pageMode === 'scroll' ? 'flip' : 'scroll');
+    setCurrentPage(0);
+  };
+
+  const goToPage = useCallback((page: number, direction: 'left' | 'right') => {
+    setIsAnimating(true);
+    setSwipeDirection(direction);
+    setTimeout(() => {
+      setCurrentPage(page);
+      setSwipeDirection(null);
+      setIsAnimating(false);
+    }, 300);
+  }, []);
+
+  const goToNextPage = useCallback(() => {
+    if (!doc) return;
+    const sentences = ((doc.sentences as unknown[]) || []) as { text: string; index: number }[];
+    const height = contentRef.current?.clientHeight || 600;
+    const pages = paginateSentences(sentences, height, fontSize);
+    if (currentPage < pages.length - 1) {
+      goToPage(currentPage + 1, 'left');
+    }
+  }, [doc, currentPage, fontSize, goToPage]);
+
+  const goToPrevPage = useCallback(() => {
+    if (currentPage > 0) {
+      goToPage(currentPage - 1, 'right');
+    }
+  }, [currentPage, goToPage]);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (pageMode !== 'flip' || isAnimating) return;
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    touchDeltaX.current = 0;
+  }, [pageMode, isAnimating]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (pageMode !== 'flip' || isAnimating) return;
+    touchDeltaX.current = e.touches[0].clientX - touchStartX.current;
+  }, [pageMode, isAnimating]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (pageMode !== 'flip' || isAnimating) return;
+    const threshold = 60;
+    if (touchDeltaX.current < -threshold) {
+      goToNextPage();
+    } else if (touchDeltaX.current > threshold) {
+      goToPrevPage();
+    }
+    touchDeltaX.current = 0;
+  }, [pageMode, isAnimating, goToNextPage, goToPrevPage]);
+
+  /** 键盘翻页支持 */
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (pageMode !== 'flip' || isAnimating) return;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        goToNextPage();
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        goToPrevPage();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [pageMode, isAnimating, goToNextPage, goToPrevPage]);
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center bg-surface">
@@ -107,8 +230,15 @@ export function ImmersiveReaderPage() {
   const sentences = ((doc.sentences as unknown[]) || []) as { text: string; index: number }[];
   const content = sentences.map((s) => s.text).join('');
 
+  const pages = paginateSentences(sentences, contentRef.current?.clientHeight || 600, fontSize);
+  const pageText = pages.map((p) => p.join(''));
+
+  const pageBg = theme === 'dark' ? 'bg-[#1a1a2e]' : 'bg-[#f5f0eb]';
+  const textColor = theme === 'dark' ? 'text-[#e2e8f0]' : 'text-[#2d3436]';
+  const borderColor = theme === 'dark' ? 'border-[#334155]' : 'border-[#e2e0dc]';
+
   return (
-    <div className={`h-full flex flex-col relative ${theme === 'dark' ? 'bg-[#1a1a2e] text-[#e2e8f0]' : 'bg-[#f5f0eb] text-[#2d3436]'}`}>
+    <div className={`h-full flex flex-col relative ${pageBg} ${textColor}`}>
       <Header
         title={doc.title}
         showBack
@@ -116,22 +246,101 @@ export function ImmersiveReaderPage() {
         transparent
       />
 
-      <div className="flex-1 overflow-y-auto px-6 pt-2 pb-4">
-        <div className={fontSizes[fontSize]}>
-          {sentences.map((s, i) => (
-            <p key={i} className="mb-1 text-justify">
-              {s.text}
-            </p>
-          ))}
+      {/* 翻页模式 */}
+      {pageMode === 'flip' ? (
+        <div
+          ref={contentRef}
+          className="flex-1 relative overflow-hidden select-none"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div className="relative w-full h-full">
+            {pages.map((pageSentences, pageIdx) => {
+              if (Math.abs(pageIdx - currentPage) > 1 && !isAnimating) return null;
+
+              let transform = 'translateX(0)';
+              let opacity = '0';
+              let zIndex = '0';
+
+              if (isAnimating && swipeDirection === 'left') {
+                if (pageIdx === currentPage) {
+                  transform = 'translateX(-100%)';
+                  opacity = '1';
+                  zIndex = '10';
+                } else if (pageIdx === currentPage + 1) {
+                  transform = 'translateX(0)';
+                  opacity = '1';
+                  zIndex = '20';
+                }
+              } else if (isAnimating && swipeDirection === 'right') {
+                if (pageIdx === currentPage) {
+                  transform = 'translateX(100%)';
+                  opacity = '1';
+                  zIndex = '10';
+                } else if (pageIdx === currentPage - 1) {
+                  transform = 'translateX(0)';
+                  opacity = '1';
+                  zIndex = '20';
+                }
+              } else if (pageIdx === currentPage) {
+                opacity = '1';
+                zIndex = '10';
+              }
+
+              return (
+                <div
+                  key={pageIdx}
+                  className="absolute inset-0 px-6 py-6 overflow-y-auto transition-transform duration-300 ease-out"
+                  style={{ transform, opacity, zIndex }}
+                >
+                  <div className={fontSizes[fontSize]}>
+                    {pageSentences.map((text, i) => (
+                      <p key={i} className="mb-1 text-justify">
+                        {text}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 翻页指示器 */}
+          <div className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none">
+            <span className="text-xs text-text-muted/50 bg-surface-card/70 px-3 py-1 rounded-full">
+              {currentPage + 1} / {pages.length}
+            </span>
+          </div>
+
+          {/* 左/右翻页区域按钮（轻触翻页） */}
+          <button
+            className="absolute left-0 top-0 bottom-0 w-[30%] z-30"
+            onClick={goToPrevPage}
+          />
+          <button
+            className="absolute right-0 top-0 bottom-0 w-[30%] z-30"
+            onClick={goToNextPage}
+          />
         </div>
-      </div>
+      ) : (
+        /* 上下滑动模式 */
+        <div ref={contentRef} className="flex-1 overflow-y-auto px-6 pt-2 pb-4">
+          <div className={fontSizes[fontSize]}>
+            {sentences.map((s, i) => (
+              <p key={i} className="mb-1 text-justify">
+                {s.text}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 底部导航栏 */}
-      <div className={`flex items-center justify-around px-4 py-3 border-t ${theme === 'dark' ? 'border-[#334155] bg-[#1a1a2e]' : 'border-[#e2e0dc] bg-[#f5f0eb]'}`}>
-        {/* 目录 */}
+      <div className={`flex items-center justify-around px-4 py-3 border-t ${borderColor} ${pageBg}`}>
         <button
           onClick={() => setShowToc(true)}
-          className="flex flex-col items-center gap-0.5 px-3 py-1"
+          className="flex flex-col items-center gap-0.5 px-2 py-1"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="8" y1="6" x2="21" y2="6" />
@@ -144,10 +353,9 @@ export function ImmersiveReaderPage() {
           <span className="text-[10px] opacity-60">目录</span>
         </button>
 
-        {/* 当前书介绍 */}
         <button
           onClick={() => setShowIntro(true)}
-          className="flex flex-col items-center gap-0.5 px-3 py-1"
+          className="flex flex-col items-center gap-0.5 px-2 py-1"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
@@ -157,10 +365,9 @@ export function ImmersiveReaderPage() {
           <span className="text-[10px] opacity-60">简介</span>
         </button>
 
-        {/* 主题黑白切换 */}
         <button
           onClick={toggleTheme}
-          className="flex flex-col items-center gap-0.5 px-3 py-1"
+          className="flex flex-col items-center gap-0.5 px-2 py-1"
         >
           {theme === 'dark' ? (
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -182,10 +389,34 @@ export function ImmersiveReaderPage() {
           <span className="text-[10px] opacity-60">{theme === 'dark' ? '日间' : '夜间'}</span>
         </button>
 
-        {/* 字体大小调节 */}
+        <button
+          onClick={togglePageMode}
+          className={`flex flex-col items-center gap-0.5 px-2 py-1 ${pageMode === 'flip' ? 'opacity-100' : 'opacity-60'}`}
+        >
+          {pageMode === 'flip' ? (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="18" rx="1" />
+              <rect x="14" y="3" width="7" height="18" rx="1" />
+              <line x1="10" y1="3" x2="14" y2="3" />
+              <line x1="10" y1="21" x2="14" y2="21" />
+            </svg>
+          ) : (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="8" y1="2" x2="21" y2="2" />
+              <line x1="8" y1="8" x2="21" y2="8" />
+              <line x1="8" y1="14" x2="21" y2="14" />
+              <line x1="8" y1="20" x2="21" y2="20" />
+              <line x1="3" y1="6" x2="3.01" y2="6" />
+              <line x1="3" y1="12" x2="3.01" y2="12" />
+              <line x1="3" y1="18" x2="3.01" y2="18" />
+            </svg>
+          )}
+          <span className="text-[10px]">{pageMode === 'flip' ? '翻页' : '滚动'}</span>
+        </button>
+
         <button
           onClick={() => setShowFontSize(true)}
-          className="flex flex-col items-center gap-0.5 px-3 py-1"
+          className="flex flex-col items-center gap-0.5 px-2 py-1"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="4 7 4 4 20 4 20 7" />
