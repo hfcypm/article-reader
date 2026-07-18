@@ -56,15 +56,17 @@ const FONT_SIZE_LABELS: { key: FontSize; label: string }[] = [
 
 type PageMode = 'scroll' | 'flip';
 
-/**
- * 将句子按可视区域高度分页，每页填满后开始新页
- */
+interface PageData {
+  texts: string[];
+  firstSentenceIndex: number;
+}
+
 function paginateSentences(
   sentences: { text: string; index: number }[],
   containerHeight: number,
   fontSize: FontSize,
-): string[][] {
-  if (!containerHeight || sentences.length === 0) return [[]];
+): PageData[] {
+  if (!containerHeight || sentences.length === 0) return [{ texts: [], firstSentenceIndex: 0 }];
 
   const lineHeightMap: Record<FontSize, number> = {
     small: 26,
@@ -79,21 +81,25 @@ function paginateSentences(
   const avgCharsPerLine = Math.max(20, Math.floor(400 / (lineHeight / 28)));
   const avgCharsPerPage = maxLinesPerPage * avgCharsPerLine;
 
-  const pages: string[][] = [];
-  let currentPage: string[] = [];
+  const pages: PageData[] = [];
+  let currentTexts: string[] = [];
   let currentCharCount = 0;
+  let pageFirstSentence = 0;
 
   for (const s of sentences) {
-    if (currentCharCount + s.text.length > avgCharsPerPage && currentPage.length > 0) {
-      pages.push(currentPage);
-      currentPage = [];
+    if (currentTexts.length === 0) {
+      pageFirstSentence = s.index;
+    }
+    if (currentCharCount + s.text.length > avgCharsPerPage && currentTexts.length > 0) {
+      pages.push({ texts: currentTexts, firstSentenceIndex: pageFirstSentence });
+      currentTexts = [];
       currentCharCount = 0;
     }
-    currentPage.push(s.text);
+    currentTexts.push(s.text);
     currentCharCount += s.text.length;
   }
-  if (currentPage.length > 0) {
-    pages.push(currentPage);
+  if (currentTexts.length > 0) {
+    pages.push({ texts: currentTexts, firstSentenceIndex: pageFirstSentence });
   }
 
   return pages;
@@ -131,13 +137,62 @@ export function ImmersiveReaderPage() {
     const res = await api.get<Document>(`/documents/${id}`);
     if (res.success && res.data) {
       setDoc(res.data);
+
+      const shelfRes = await api.get<{ currentSentence: number }[]>(
+        `/bookshelf?search=${encodeURIComponent(res.data.title)}`
+      );
+      if (shelfRes.success && shelfRes.data && shelfRes.data.length > 0) {
+        const savedSentence = shelfRes.data[0].currentSentence || 0;
+        const sentences = ((res.data.sentences as unknown[]) || []) as { text: string; index: number }[];
+        const height = contentRef.current?.clientHeight || 600;
+        const pages = paginateSentences(sentences, height, fontSize);
+        const pageIdx = pages.findIndex(
+          (p) => p.firstSentenceIndex >= savedSentence
+        );
+        setCurrentPage(pageIdx >= 0 ? pageIdx : pages.length - 1);
+      }
     }
     setLoading(false);
   };
 
+  const currentSentenceRef = useRef(0);
+
+  const saveProgress = useCallback(async () => {
+    if (!docId) return;
+    await api.put(`/bookshelf/${docId}/progress`, { currentSentence: currentSentenceRef.current });
+  }, [docId]);
+
+  /** 页面卸载前自动保存阅读进度 */
+  useEffect(() => {
+    const handleBeforeUnload = () => saveProgress();
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [saveProgress]);
+
   const handleBack = useCallback(() => {
+    saveProgress();
     navigate(-1);
-  }, [navigate]);
+  }, [saveProgress, navigate]);
+
+  const handleScroll = useCallback(() => {
+    if (!doc || !contentRef.current) return;
+    const scrollTop = contentRef.current.scrollTop;
+    const lineHeightMap: Record<FontSize, number> = { small: 26, medium: 30, large: 36, xlarge: 42 };
+    const lineHeight = lineHeightMap[fontSize];
+    const avgCharsPerLine = Math.max(20, Math.floor(360 / (lineHeight / 28)));
+    const estimatedCharIndex = Math.floor(scrollTop / lineHeight) * avgCharsPerLine;
+
+    const sentences = ((doc.sentences as unknown[]) || []) as { text: string; index: number }[];
+    let charCount = 0;
+    for (const s of sentences) {
+      charCount += s.text.length;
+      if (charCount >= estimatedCharIndex) {
+        currentSentenceRef.current = s.index;
+        return;
+      }
+    }
+    currentSentenceRef.current = sentences.length > 0 ? sentences[sentences.length - 1].index : 0;
+  }, [doc, fontSize]);
 
   const toggleTheme = () => {
     setTheme(theme === 'light' ? 'dark' : 'light');
@@ -148,6 +203,17 @@ export function ImmersiveReaderPage() {
     setCurrentPage(0);
     setFlipOffset(0);
   };
+
+  /** 根据当前页更新对应的句子索引 */
+  useEffect(() => {
+    if (!doc) return;
+    const sentences = ((doc.sentences as unknown[]) || []) as { text: string; index: number }[];
+    const height = contentRef.current?.clientHeight || 600;
+    const pages = paginateSentences(sentences, height, fontSize);
+    if (pages[currentPage]) {
+      currentSentenceRef.current = pages[currentPage].firstSentenceIndex;
+    }
+  }, [currentPage, doc, fontSize]);
 
   const flipToPage = useCallback((targetPage: number) => {
     const w = containerWidth.current || 360;
@@ -259,7 +325,7 @@ export function ImmersiveReaderPage() {
   const content = sentences.map((s) => s.text).join('');
 
   const pages = paginateSentences(sentences, contentRef.current?.clientHeight || 600, fontSize);
-  const pageText = pages.map((p) => p.join(''));
+  const pageText = pages.map((p) => p.texts.join(''));
 
   const pageBg = theme === 'dark' ? 'bg-[#1a1a2e]' : 'bg-[#f5f0eb]';
   const pageBgRaw = theme === 'dark' ? '#1a1a2e' : '#f5f0eb';
@@ -294,7 +360,7 @@ export function ImmersiveReaderPage() {
           {flipOffset < 0 && currentPage < pages.length - 1 && (
             <div className="absolute inset-0 px-6 py-6 overflow-y-auto" style={{ zIndex: 1, backgroundColor: pageBgRaw }}>
               <div className={fontSizes[fontSize]}>
-                {pages[currentPage + 1].map((text, i) => (
+                {pages[currentPage + 1].texts.map((text, i) => (
                   <p key={i} className="mb-1 text-justify">{text}</p>
                 ))}
               </div>
@@ -303,7 +369,7 @@ export function ImmersiveReaderPage() {
           {flipOffset > 0 && currentPage > 0 && (
             <div className="absolute inset-0 px-6 py-6 overflow-y-auto" style={{ zIndex: 1, backgroundColor: pageBgRaw }}>
               <div className={fontSizes[fontSize]}>
-                {pages[currentPage - 1].map((text, i) => (
+                {pages[currentPage - 1].texts.map((text, i) => (
                   <p key={i} className="mb-1 text-justify">{text}</p>
                 ))}
               </div>
@@ -321,7 +387,7 @@ export function ImmersiveReaderPage() {
             }}
           >
             <div className={fontSizes[fontSize]}>
-              {pages[currentPage]?.map((text, i) => (
+              {pages[currentPage]?.texts.map((text, i) => (
                 <p key={i} className="mb-1 text-justify">{text}</p>
               ))}
             </div>
@@ -346,7 +412,7 @@ export function ImmersiveReaderPage() {
         </div>
       ) : (
         /* 上下滑动模式 */
-        <div ref={contentRef} className="flex-1 overflow-y-auto px-6 pt-2 pb-4">
+        <div ref={contentRef} className="flex-1 overflow-y-auto px-6 pt-2 pb-4" onScroll={handleScroll}>
           <div className={fontSizes[fontSize]}>
             {sentences.map((s, i) => (
               <p key={i} className="mb-1 text-justify">
