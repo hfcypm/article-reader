@@ -1,12 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Card } from '@/components/ui/card';
-import { useSettingsStore, type FontSize, type Theme, type Language } from '@/store/settingsStore';
+import { useSettingsStore, type FontSize, type Theme, type Language, type ReadingMode } from '@/store/settingsStore';
 import { SPEED_OPTIONS, type SpeedOption } from '@/lib/utils';
 
-/**
- * 字体大小选项列表，用于阅读器 UI 切换
- */
 const FONT_SIZES: { key: FontSize; label: string }[] = [
   { key: 'small', label: '小' },
   { key: 'medium', label: '中' },
@@ -14,13 +11,15 @@ const FONT_SIZES: { key: FontSize; label: string }[] = [
   { key: 'xlarge', label: '特大' },
 ];
 
-/**
- * 界面语言选项列表
- */
 const LANGUAGES: { key: Language; label: string }[] = [
   { key: 'zh-CN', label: '简体中文' },
   { key: 'zh-TW', label: '繁體中文' },
   { key: 'en', label: 'English' },
+];
+
+const READING_MODES: { key: ReadingMode; label: string; desc: string; icon: 'audio' | 'text' }[] = [
+  { key: 'tts', label: '有声朗读', desc: '逐句语音朗读，支持倍速调节', icon: 'audio' },
+  { key: 'immersive', label: '文本阅读', desc: '沉浸式阅读，自主翻页与调节', icon: 'text' },
 ];
 
 /**
@@ -34,15 +33,34 @@ const SPEED_LABELS: Record<number, string> = {
   2.0: '2.0x',
 };
 
+function ReadingModeIcon({ type }: { type: 'audio' | 'text' }) {
+  if (type === 'audio') {
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+      <line x1="8" y1="7" x2="16" y2="7" />
+      <line x1="8" y1="11" x2="14" y2="11" />
+    </svg>
+  );
+}
+
 /**
  * 设置页面 - 管理阅读偏好，包括字体大小、主题、界面语言、播放速度、语音朗读
  */
 export function SettingsPage() {
   const navigate = useNavigate();
-  /** 从全局状态中获取所有阅读偏好设置 */
   const {
-    fontSize, theme, language, defaultSpeed, ttsEnabled,
-    setFontSize, setTheme, setLanguage, setDefaultSpeed, setTtsEnabled,
+    fontSize, theme, language, defaultSpeed, ttsEnabled, readingMode,
+    setFontSize, setTheme, setLanguage, setDefaultSpeed, setTtsEnabled, setReadingMode,
   } = useSettingsStore();
 
   return (
@@ -133,6 +151,38 @@ export function SettingsPage() {
                     <p className="text-[11px] text-text-muted">适合夜间阅读</p>
                   </div>
                 </button>
+              </div>
+            </div>
+          </Card>
+
+          {/* 阅读方式选择 */}
+          <Card>
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-text">阅读方式</p>
+              <div className="grid grid-cols-2 gap-3">
+                {READING_MODES.map((mode) => (
+                  <button
+                    key={mode.key}
+                    onClick={() => setReadingMode(mode.key)}
+                    className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-colors ${
+                      readingMode === mode.key
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border bg-surface-card hover:border-primary/30'
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      readingMode === mode.key ? 'bg-primary text-white' : 'bg-surface-card text-text-muted'
+                    }`}>
+                      <ReadingModeIcon type={mode.icon} />
+                    </div>
+                    <div className="text-left">
+                      <p className={`text-sm font-medium ${readingMode === mode.key ? 'text-primary' : 'text-text'}`}>
+                        {mode.label}
+                      </p>
+                      <p className="text-[11px] text-text-muted">{mode.desc}</p>
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
           </Card>

@@ -14,6 +14,7 @@ import { BookshelfPage } from './pages/BookshelfPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { DetailPage } from './pages/DetailPage';
 import { ReaderPage } from './pages/ReaderPage';
+import { ImmersiveReaderPage } from './pages/ImmersiveReaderPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -89,6 +90,7 @@ export default function App() {
         </Route>
         <Route path="/detail/:docId" element={<ProtectedRoute><DetailPage /></ProtectedRoute>} />
         <Route path="/reader/:docId" element={<ProtectedRoute><ReaderPage /></ProtectedRoute>} />
+        <Route path="/immersive-reader/:docId" element={<ProtectedRoute><ImmersiveReaderPage /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
       </Routes>
       <ToastContainer />

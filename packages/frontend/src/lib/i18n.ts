@@ -52,6 +52,31 @@ const translations: TranslationMap = {
     'zh-TW': '默認開啟朗讀',
     'en': 'TTS by Default',
   },
+  'settings.readingMode': {
+    'zh-CN': '阅读方式',
+    'zh-TW': '閱讀方式',
+    'en': 'Reading Mode',
+  },
+  'settings.readingMode.tts': {
+    'zh-CN': '有声朗读',
+    'zh-TW': '有聲朗讀',
+    'en': 'Audio Reading',
+  },
+  'settings.readingMode.tts.desc': {
+    'zh-CN': '逐句语音朗读，支持倍速调节',
+    'zh-TW': '逐句語音朗讀，支援倍速調節',
+    'en': 'Sentence-by-sentence TTS with speed control',
+  },
+  'settings.readingMode.immersive': {
+    'zh-CN': '文本阅读',
+    'zh-TW': '文本閱讀',
+    'en': 'Text Reading',
+  },
+  'settings.readingMode.immersive.desc': {
+    'zh-CN': '沉浸式阅读，自主翻页与调节',
+    'zh-TW': '沉浸式閱讀，自主翻頁與調節',
+    'en': 'Immersive reading with manual page turning',
+  },
   'settings.fontSize.small': {
     'zh-CN': '小',
     'zh-TW': '小',

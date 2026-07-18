@@ -7,7 +7,7 @@
  * - 书名编辑功能
  * - 阅读速度选择器
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { showToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { formatDate, SPEED_OPTIONS, type SpeedOption } from '@/lib/utils';
+import { useSettingsStore } from '@/store/settingsStore';
 import type { Document } from '@/types';
 
 // 文档信息统计卡片配置：key、展示标签、图标名、颜色主题
@@ -62,6 +63,11 @@ export function DetailPage() {
   // 阅读速度选择
   const [speed, setSpeed] = useState<SpeedOption>(1.0);
   const navigate = useNavigate();
+  const { readingMode } = useSettingsStore();
+
+  const getReaderPath = useCallback(() => {
+    return readingMode === 'immersive' ? `/immersive-reader/${docId}` : `/reader/${docId}`;
+  }, [readingMode, docId]);
 
   // URL 参数 docId 变化时重新加载文档
   useEffect(() => {
@@ -273,7 +279,7 @@ export function DetailPage() {
           </div>
 
           {inBookshelf ? (
-            <Button className="flex-1 h-11 text-sm shadow-lg shadow-primary/20" onClick={() => navigate(`/reader/${docId}`, { state: { speed } })}>
+            <Button className="flex-1 h-11 text-sm shadow-lg shadow-primary/20" onClick={() => navigate(getReaderPath(), { state: { speed } })}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="5 3 19 12 5 21 5 3"/>
               </svg>
@@ -288,7 +294,7 @@ export function DetailPage() {
                 </svg>
                 加入书架
               </Button>
-              <Button className="flex-1 h-11 text-sm shadow-lg shadow-primary/20" onClick={() => navigate(`/reader/${docId}`, { state: { speed } })}>
+              <Button className="flex-1 h-11 text-sm shadow-lg shadow-primary/20" onClick={() => navigate(getReaderPath(), { state: { speed } })}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polygon points="5 3 19 12 5 21 5 3"/>
                 </svg>
@@ -320,7 +326,7 @@ export function DetailPage() {
             </svg>
             加入书架
           </Button>
-          <Button variant="secondary" className="w-full h-11" onClick={() => { setShowPrompt(false); navigate(`/reader/${docId}`, { state: { speed } }); }}>
+          <Button variant="secondary" className="w-full h-11" onClick={() => { setShowPrompt(false); navigate(getReaderPath(), { state: { speed } }); }}>
             直接阅读
           </Button>
           <Button variant="ghost" className="w-full h-11" onClick={() => setShowPrompt(false)}>

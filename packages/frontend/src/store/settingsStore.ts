@@ -9,6 +9,7 @@ import { type SpeedOption } from '../lib/utils';
 export type FontSize = 'small' | 'medium' | 'large' | 'xlarge';
 export type Theme = 'light' | 'dark';
 export type Language = 'zh-CN' | 'zh-TW' | 'en';
+export type ReadingMode = 'tts' | 'immersive';
 
 /** 设置状态接口 */
 interface SettingsState {
@@ -17,11 +18,13 @@ interface SettingsState {
   language: Language;
   defaultSpeed: SpeedOption;
   ttsEnabled: boolean;
+  readingMode: ReadingMode;
   setFontSize: (size: FontSize) => void;
   setTheme: (theme: Theme) => void;
   setLanguage: (lang: Language) => void;
   setDefaultSpeed: (speed: SpeedOption) => void;
   setTtsEnabled: (enabled: boolean) => void;
+  setReadingMode: (mode: ReadingMode) => void;
   /** 从 localStorage 加载已保存的设置 */
   load: () => void;
 }
@@ -52,6 +55,7 @@ const defaults = {
   language: 'zh-CN' as Language,
   defaultSpeed: 1.0 as SpeedOption,
   ttsEnabled: false,
+  readingMode: 'tts' as ReadingMode,
 };
 
 /**
@@ -82,6 +86,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     saveToStorage({ ttsEnabled });
     set({ ttsEnabled });
   },
+  setReadingMode: (readingMode) => {
+    saveToStorage({ readingMode });
+    set({ readingMode });
+  },
   load: () => {
     const stored = loadFromStorage();
     set({
@@ -90,6 +98,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       language: stored.language || defaults.language,
       defaultSpeed: stored.defaultSpeed || defaults.defaultSpeed,
       ttsEnabled: stored.ttsEnabled ?? defaults.ttsEnabled,
+      readingMode: stored.readingMode || defaults.readingMode,
     });
   },
 }));

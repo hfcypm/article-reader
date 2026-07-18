@@ -215,3 +215,16 @@ body {
 .animate-indeterminate {
   animation: indeterminate 2s ease-in-out infinite;
 }
+
+.animate-slide-up-sheet {
+  animation: slideUpSheet 0.3s ease-out;
+}
+
+@keyframes slideUpSheet {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
