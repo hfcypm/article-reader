@@ -75,8 +75,10 @@ export function HomePage() {
     selfTargetRef.current = 0;
 
     const timer = setInterval(() => {
-      selfTargetRef.current = Math.min(selfTargetRef.current + 0.5, 70);
-      const effectiveTarget = Math.max(serverProgressRef.current, selfTargetRef.current);
+      const serverProgress = serverProgressRef.current;
+      const cap = serverProgress > 0 ? Math.min(serverProgress + 5, 95) : 70;
+      selfTargetRef.current = Math.min(selfTargetRef.current + 0.5, cap);
+      const effectiveTarget = Math.max(serverProgress, selfTargetRef.current);
 
       setDisplayProgress((prev) => {
         if (prev >= effectiveTarget) return prev;
