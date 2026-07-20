@@ -17,6 +17,7 @@ import { startGitPullCron } from './cron/gitPullCron';
 const app = new Elysia({
   serve: {
     maxRequestBodySize: 200 * 1024 * 1024,
+    idleTimeout: 255,
   },
 })
   // 注册 CORS 跨域中间件，允许前端项目跨域访问

@@ -137,7 +137,8 @@ export function HomePage() {
     formData.append('file', file);
 
     try {
-      const res = await api.post<{ id: string }>('/documents/import', formData);
+      const isMedia = /\.(mp3|mp4)$/i.test(fileName);
+      const res = await api.post<{ id: string }>('/documents/import', formData, isMedia ? 600000 : 120000);
       if (!res.success || !res.data) {
         setImportState({ status: 'error', fileName, errorMsg: res.error || '导入失败', progress: 0 });
         e.target.value = '';
@@ -148,7 +149,6 @@ export function HomePage() {
       let successData: { title: string; format: string; wordCount: number; sentenceCount: number } | null = null;
 
       const pollProgress = async () => {
-        const isMedia = /\.(mp3|mp4)$/i.test(fileName);
         const maxRetries = isMedia ? 1200 : 120;
         for (let i = 0; i < maxRetries; i++) {
           await new Promise((r) => setTimeout(r, 500));

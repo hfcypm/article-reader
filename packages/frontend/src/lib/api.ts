@@ -23,40 +23,47 @@ function getToken(): string | null {
  * 自动附加 Authorization 头，根据 body 类型自动设置 Content-Type
  * @param endpoint - API 端点路径（不含 /api 前缀）
  * @param options - fetch 请求配置项
+ * @param timeoutMs - 可选超时时间(ms)，超时后自动 abort
  * @returns 统一的 ApiResponse 响应
  */
 async function request<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  timeoutMs?: number
 ): Promise<ApiResponse<T>> {
   const token = getToken();
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
   };
 
-  // 自动附带 JWT token
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  // FormData 上传时不设置 Content-Type，由浏览器自动处理 boundary
   if (!(options.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
 
-  const res = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  const controller = timeoutMs ? new AbortController() : undefined;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
 
-  const json = await res.json();
+  try {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers,
+      signal: controller?.signal,
+    });
 
-  // HTTP 状态码异常时返回统一的错误格式
-  if (!res.ok && json.error) {
-    return { success: false, error: json.error };
+    const json = await res.json();
+
+    if (!res.ok && json.error) {
+      return { success: false, error: json.error };
+    }
+
+    return json;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
-
-  return json;
 }
 
 /**
@@ -64,12 +71,12 @@ async function request<T>(
  * 提供 get / post / put / delete 四个常用 REST 方法
  */
 export const api = {
-  get: <T>(endpoint: string) => request<T>(endpoint),
-  post: <T>(endpoint: string, body?: unknown) =>
+  get: <T>(endpoint: string, timeoutMs?: number) => request<T>(endpoint, {}, timeoutMs),
+  post: <T>(endpoint: string, body?: unknown, timeoutMs?: number) =>
     request<T>(endpoint, {
       method: "POST",
       body: body instanceof FormData ? body : JSON.stringify(body),
-    }),
+    }, timeoutMs),
   put: <T>(endpoint: string, body?: unknown) =>
     request<T>(endpoint, {
       method: "PUT",

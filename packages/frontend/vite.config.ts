@@ -26,6 +26,8 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3001', // 后端 API 地址
         changeOrigin: true, // 修改请求头中的 Origin
+        timeout: 600000, // 代理超时 10 分钟 (支持大文件上传)
+        proxyTimeout: 600000,
       },
     },
   },
