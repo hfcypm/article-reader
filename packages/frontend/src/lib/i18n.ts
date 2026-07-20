@@ -188,9 +188,9 @@ const translations: TranslationMap = {
     'en': 'Import Document',
   },
   'home.import.hint': {
-    'zh-CN': '支持 TXT / MOBI / PDF 格式，最大 50MB',
-    'zh-TW': '支援 TXT / MOBI / PDF 格式，最大 50MB',
-    'en': 'Supports TXT / MOBI / PDF, up to 50MB',
+    'zh-CN': '支持 TXT / MOBI / PDF / MP3 / MP4 格式，最大 50MB',
+    'zh-TW': '支援 TXT / MOBI / PDF / MP3 / MP4 格式，最大 50MB',
+    'en': 'Supports TXT / MOBI / PDF / MP3 / MP4, up to 50MB',
   },
   'home.continueReading': {
     'zh-CN': '继续阅读',

@@ -1,11 +1,12 @@
 /**
  * 文档服务模块
  *
- * 管理文档的导入、解析、查询和删除。支持 TXT、PDF、MOBI 三种格式，
- * 文件上传后异步解析文本内容并分句存储。
+ * 管理文档的导入、解析、查询和删除。支持 TXT、PDF、MOBI、MP3、MP4 格式，
+ * 文件上传后异步解析文本内容（媒体文件通过语音识别）并分句存储。
  */
 import { PrismaClient } from '@prisma/client';
 import { splitSentences, countWords, detectEncoding, parseTextContent, extractPdfText, extractMobiText } from '../utils/text-parser';
+import { transcribeMedia } from '../utils/media-transcriber';
 
 const prisma = new PrismaClient();
 
@@ -18,31 +19,41 @@ const prisma = new PrismaClient();
  */
 async function processDocument(docId: string, buffer: ArrayBuffer, ext: string, title: string) {
   try {
-    // 阶段 1：开始解析
     await prisma.document.update({
       where: { id: docId },
       data: { progress: 10 },
     });
 
     let text: string;
-    // 根据文件类型选择解析器
-    if (ext === 'pdf') {
+    const isMedia = ext === 'mp3' || ext === 'mp4';
+
+    if (isMedia) {
+      await prisma.document.update({
+        where: { id: docId },
+        data: { progress: 20 },
+      });
+      text = await transcribeMedia(buffer, ext);
+
+      await prisma.document.update({
+        where: { id: docId },
+        data: { progress: 50 },
+      });
+    } else if (ext === 'pdf') {
       text = await extractPdfText(buffer);
     } else if (ext === 'mobi') {
       text = extractMobiText(buffer);
     } else {
-      // TXT 等文本文件需要先检测编码再解析
       const encoding = detectEncoding(buffer);
       text = parseTextContent(buffer, encoding);
     }
 
-    // 阶段 2：文本提取完成
-    await prisma.document.update({
-      where: { id: docId },
-      data: { progress: 30 },
-    });
+    if (!isMedia) {
+      await prisma.document.update({
+        where: { id: docId },
+        data: { progress: 30 },
+      });
+    }
 
-    // 文本内容为空，标记解析失败
     if (text.trim().length === 0) {
       await prisma.document.update({
         where: { id: docId },
@@ -51,14 +62,12 @@ async function processDocument(docId: string, buffer: ArrayBuffer, ext: string, 
       return;
     }
 
-    // 阶段 3：分割句子
     const sentences = splitSentences(text);
     await prisma.document.update({
       where: { id: docId },
       data: { progress: 60 },
     });
 
-    // 阶段 4：统计字数
     const wordCount = countWords(text);
 
     await prisma.document.update({
@@ -66,7 +75,6 @@ async function processDocument(docId: string, buffer: ArrayBuffer, ext: string, 
       data: { progress: 80 },
     });
 
-    // 阶段 5：写入最终结果
     await prisma.document.update({
       where: { id: docId },
       data: {
@@ -80,7 +88,6 @@ async function processDocument(docId: string, buffer: ArrayBuffer, ext: string, 
       },
     });
   } catch (e) {
-    // 解析过程中发生异常，标记为失败
     await prisma.document.update({
       where: { id: docId },
       data: { status: 'failed', progress: 0 },
@@ -94,14 +101,14 @@ export class DocumentService {
    * 校验文件格式和大小限制，创建数据库记录后启动异步解析
    */
   async importDocument(userId: string, file: File) {
-    const allowedFormats = ['txt', 'mobi', 'pdf'];
+    const allowedFormats = ['txt', 'mobi', 'pdf', 'mp3', 'mp4'];
     const fileName = file.name;
     // 提取文件扩展名（不含点号）
     const ext = fileName.split('.').pop()?.toLowerCase() || '';
 
     // 校验文件格式
     if (!allowedFormats.includes(ext)) {
-      throw new Error(`不支持的格式：${ext}，V1.0 支持 TXT、MOBI、PDF`);
+      throw new Error(`不支持的格式：${ext}，支持 TXT、MOBI、PDF、MP3、MP4`);
     }
 
     // 校验文件大小（最大 50MB）

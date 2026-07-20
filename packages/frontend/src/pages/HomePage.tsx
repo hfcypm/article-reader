@@ -110,8 +110,8 @@ export function HomePage() {
     const fileName = file.name;
     const ext = fileName.split('.').pop()?.toLowerCase() || '';
 
-    if (!['txt', 'mobi', 'pdf'].includes(ext)) {
-      showToast('仅支持 TXT、MOBI、PDF 格式', 'error');
+    if (!['txt', 'mobi', 'pdf', 'mp3', 'mp4'].includes(ext)) {
+      showToast('仅支持 TXT、MOBI、PDF、MP3、MP4 格式', 'error');
       e.target.value = '';
       return;
     }
@@ -277,7 +277,7 @@ export function HomePage() {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".txt,.mobi,.pdf"
+          accept=".txt,.mobi,.pdf,.mp3,.mp4"
           className="hidden"
           onChange={handleImport}
         />
@@ -415,7 +415,7 @@ export function HomePage() {
                   ) : '2'}
                 </div>
                 <span className={importState.status === 'parsing' ? 'text-primary font-medium' : 'text-text-muted/40'}>
-                  解析文本内容
+                  {/\.(mp3|mp4)$/i.test(importState.fileName) ? '语音识别' : '解析文本内容'}
                 </span>
               </div>
             </div>
