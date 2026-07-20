@@ -14,7 +14,11 @@ import { bookshelfRoutes } from './routes/bookshelf';
 import { userRoutes } from './routes/user';
 import { startGitPullCron } from './cron/gitPullCron';
 
-const app = new Elysia()
+const app = new Elysia({
+  serve: {
+    maxRequestBodySize: 200 * 1024 * 1024,
+  },
+})
   // 注册 CORS 跨域中间件，允许前端项目跨域访问
   .use(cors({
     origin: true,

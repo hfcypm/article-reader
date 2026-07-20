@@ -148,7 +148,9 @@ export function HomePage() {
       let successData: { title: string; format: string; wordCount: number; sentenceCount: number } | null = null;
 
       const pollProgress = async () => {
-        for (let i = 0; i < 120; i++) {
+        const isMedia = /\.(mp3|mp4)$/i.test(fileName);
+        const maxRetries = isMedia ? 1200 : 120;
+        for (let i = 0; i < maxRetries; i++) {
           await new Promise((r) => setTimeout(r, 500));
           const progressRes = await api.get<{
             status: string; progress: number; title: string;
