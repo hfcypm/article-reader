@@ -170,9 +170,9 @@ export function ReaderPage() {
   }, [saveProgress]);
 
   /** 返回上一页并保存进度 */
-  const handleBack = () => {
+  const handleBack = async () => {
     window.speechSynthesis?.cancel();
-    saveProgress();
+    await saveProgress();
     navigate(-1);
   };
 
@@ -254,18 +254,6 @@ export function ReaderPage() {
       document.removeEventListener('touchend', handleDragEnd);
     };
   }, [isDragging, handleDragMove, handleDragEnd]);
-
-  /** 点击进度条直接跳转到对应句子 */
-  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    window.speechSynthesis?.cancel();
-    if (!doc) return;
-    const sentences = ((doc.sentences as unknown[]) || []) as { text: string }[];
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const targetIndex = Math.floor(ratio * (sentences.length - 1));
-    setCurrentIndex(targetIndex);
-    setIsPlaying(false);
-  };
 
   /** 字体大小对应的 Tailwind CSS 类名映射 */
   const fontSizes: Record<FontSize, string> = {
@@ -354,7 +342,6 @@ export function ReaderPage() {
           <div
             ref={progressBarRef}
             className="h-8 flex items-center cursor-pointer relative group select-none touch-none"
-            onClick={handleProgressClick}
             onMouseDown={handleDragStart}
             onTouchStart={handleDragStart}
           >

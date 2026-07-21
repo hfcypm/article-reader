@@ -169,8 +169,8 @@ export function ImmersiveReaderPage() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [saveProgress]);
 
-  const handleBack = useCallback(() => {
-    saveProgress();
+  const handleBack = useCallback(async () => {
+    await saveProgress();
     navigate(-1);
   }, [saveProgress, navigate]);
 
