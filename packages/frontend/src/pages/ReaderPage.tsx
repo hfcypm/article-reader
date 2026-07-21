@@ -171,6 +171,10 @@ export function ReaderPage() {
 
   /** 返回上一页并保存进度 */
   const handleBack = async () => {
+    if (utteranceRef.current) {
+      utteranceRef.current.onend = null;
+      utteranceRef.current.onerror = null;
+    }
     window.speechSynthesis?.cancel();
     await saveProgress();
     navigate(-1);
@@ -179,6 +183,10 @@ export function ReaderPage() {
   /** 播放/暂停切换 */
   const handlePlayPause = () => {
     if (isPlaying) {
+      if (utteranceRef.current) {
+        utteranceRef.current.onend = null;
+        utteranceRef.current.onerror = null;
+      }
       window.speechSynthesis?.cancel();
       saveProgress();
     }
@@ -220,6 +228,10 @@ export function ReaderPage() {
   /** 拖拽开始事件处理 */
   const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     wasPlayingBeforeDragRef.current = isPlaying;
+    if (utteranceRef.current) {
+      utteranceRef.current.onend = null;
+      utteranceRef.current.onerror = null;
+    }
     window.speechSynthesis?.cancel();
     setIsDragging(true);
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
