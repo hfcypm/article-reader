@@ -85,6 +85,8 @@ export function ReaderPage() {
   const progressBarRef = useRef<HTMLDivElement>(null);
   /** 拖拽前是否正在播放 */
   const wasPlayingBeforeDragRef = useRef(false);
+  /** TTS 代际计数器，防止取消后的 onend 误触翻页 */
+  const ttsGenerationRef = useRef(0);
 
   /** 路由参数变化时加载文档 */
   useEffect(() => {
@@ -130,7 +132,10 @@ export function ReaderPage() {
     let ttsDuration = duration;
 
     if (ttsEnabled && currentSentence?.text) {
+      ttsGenerationRef.current += 1;
+      const gen = ttsGenerationRef.current;
       utteranceRef.current = speakText(currentSentence.text, speed, () => {
+        if (ttsGenerationRef.current !== gen) return;
         flushSync(() => {
           setCurrentIndex((prev) => {
             const next = prev + 1;
@@ -179,6 +184,7 @@ export function ReaderPage() {
 
   /** 返回上一页并保存进度 */
   const handleBack = async () => {
+    ttsGenerationRef.current += 1;
     if (utteranceRef.current) {
       utteranceRef.current.onend = null;
       utteranceRef.current.onerror = null;
@@ -191,6 +197,7 @@ export function ReaderPage() {
   /** 播放/暂停切换 */
   const handlePlayPause = () => {
     if (isPlaying) {
+      ttsGenerationRef.current += 1;
       if (utteranceRef.current) {
         utteranceRef.current.onend = null;
         utteranceRef.current.onerror = null;
@@ -203,6 +210,11 @@ export function ReaderPage() {
 
   /** 跳转到下一句 */
   const handleNext = () => {
+    ttsGenerationRef.current += 1;
+    if (utteranceRef.current) {
+      utteranceRef.current.onend = null;
+      utteranceRef.current.onerror = null;
+    }
     window.speechSynthesis?.cancel();
     const sentences = ((doc?.sentences as unknown[]) || []) as { text: string }[];
     if (currentIndex < sentences.length - 1) {
@@ -211,8 +223,12 @@ export function ReaderPage() {
     }
   };
 
-  /** 跳转到上一句 */
   const handlePrev = () => {
+    ttsGenerationRef.current += 1;
+    if (utteranceRef.current) {
+      utteranceRef.current.onend = null;
+      utteranceRef.current.onerror = null;
+    }
     window.speechSynthesis?.cancel();
     if (currentIndex > 0) {
       setCurrentIndex((prev) => prev - 1);
@@ -236,6 +252,7 @@ export function ReaderPage() {
   /** 拖拽开始事件处理 */
   const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     wasPlayingBeforeDragRef.current = isPlaying;
+    ttsGenerationRef.current += 1;
     if (utteranceRef.current) {
       utteranceRef.current.onend = null;
       utteranceRef.current.onerror = null;
