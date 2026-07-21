@@ -79,6 +79,8 @@ export function ReaderPage() {
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   /** 进度条 DOM 引用 */
   const progressBarRef = useRef<HTMLDivElement>(null);
+  /** 拖拽前是否正在播放 */
+  const wasPlayingBeforeDragRef = useRef(false);
 
   /** 路由参数变化时加载文档 */
   useEffect(() => {
@@ -217,11 +219,12 @@ export function ReaderPage() {
 
   /** 拖拽开始事件处理 */
   const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    wasPlayingBeforeDragRef.current = isPlaying;
     window.speechSynthesis?.cancel();
     setIsDragging(true);
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     seekToPosition(clientX);
-  }, [seekToPosition]);
+  }, [isPlaying, seekToPosition]);
 
   /** 拖拽移动事件处理 */
   const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
@@ -232,6 +235,10 @@ export function ReaderPage() {
   /** 拖拽结束事件处理 */
   const handleDragEnd = useCallback(() => {
     setIsDragging(false);
+    if (wasPlayingBeforeDragRef.current) {
+      wasPlayingBeforeDragRef.current = false;
+      setIsPlaying(true);
+    }
   }, []);
 
   /** 拖拽时绑定全局鼠标/触摸事件 */
