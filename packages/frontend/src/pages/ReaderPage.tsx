@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { flushSync } from 'react-dom';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -130,26 +131,30 @@ export function ReaderPage() {
 
     if (ttsEnabled && currentSentence?.text) {
       utteranceRef.current = speakText(currentSentence.text, speed, () => {
-        setCurrentIndex((prev) => {
-          const next = prev + 1;
-          if (next >= sentences.length) {
-            setIsPlaying(false);
-            return prev;
-          }
-          return next;
+        flushSync(() => {
+          setCurrentIndex((prev) => {
+            const next = prev + 1;
+            if (next >= sentences.length) {
+              setIsPlaying(false);
+              return prev;
+            }
+            return next;
+          });
         });
       });
     }
 
     timerRef.current = setTimeout(() => {
       if (!ttsEnabled) {
-        setCurrentIndex((prev) => {
-          const next = prev + 1;
-          if (next >= sentences.length) {
-            setIsPlaying(false);
-            return prev;
-          }
-          return next;
+        flushSync(() => {
+          setCurrentIndex((prev) => {
+            const next = prev + 1;
+            if (next >= sentences.length) {
+              setIsPlaying(false);
+              return prev;
+            }
+            return next;
+          });
         });
       }
     }, ttsDuration);
