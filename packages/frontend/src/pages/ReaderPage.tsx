@@ -53,6 +53,9 @@ export function ReaderPage() {
   const [doc, setDoc] = useState<Document | null>(null);
   /** 当前句子索引 */
   const [currentIndex, setCurrentIndex] = useState(0);
+  /** currentIndex 的同步镜像 ref，避免 saveProgress 闭包饥饿 */
+  const currentIndexRef = useRef(currentIndex);
+  currentIndexRef.current = currentIndex;
   /** 是否正在播放 */
   const [isPlaying, setIsPlaying] = useState(false);
   /** 当前播放速度 */
@@ -159,8 +162,8 @@ export function ReaderPage() {
   /** 持久化保存阅读进度到后端 */
   const saveProgress = useCallback(async () => {
     if (!docId) return;
-    await api.put(`/bookshelf/${docId}/progress`, { currentSentence: currentIndex });
-  }, [docId, currentIndex]);
+    await api.put(`/bookshelf/${docId}/progress`, { currentSentence: currentIndexRef.current });
+  }, [docId]);
 
   /** 页面卸载/关闭前自动保存阅读进度 */
   useEffect(() => {
