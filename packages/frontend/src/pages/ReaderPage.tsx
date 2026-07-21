@@ -404,7 +404,7 @@ export function ReaderPage() {
           >
             <div className="w-full h-1.5 bg-border/30 rounded-full overflow-hidden relative">
               <div
-                className={`h-full bg-primary rounded-full ${isDragging ? '' : 'transition-all duration-500'}`}
+                className={`h-full bg-primary rounded-full`}
                 style={{ width: `${progress * 100}%` }}
               />
               <div
