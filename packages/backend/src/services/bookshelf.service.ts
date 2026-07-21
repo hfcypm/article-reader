@@ -183,11 +183,12 @@ export class BookshelfService {
    * 记录当前阅读到的句子索引，自动计算百分比进度并更新最后阅读时间
    */
   async updateProgress(userId: string, docId: string, currentSentence: number) {
-    const item = await prisma.bookshelfItem.findUnique({
+    let item = await prisma.bookshelfItem.findUnique({
       where: { userId_docId: { userId, docId } },
     });
-    // 文档不在书架中时返回 null，路由层做降级处理
-    if (!item) return null;
+    if (!item) {
+      item = await this.addToBookshelf(userId, docId);
+    }
 
     const doc = await prisma.document.findFirst({ where: { id: docId, userId } });
     if (!doc) throw new Error('文档不存在');
