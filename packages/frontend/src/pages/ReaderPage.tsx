@@ -184,6 +184,10 @@ export function ReaderPage() {
 
   /** 返回上一页并保存进度 */
   const handleBack = async () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
     ttsGenerationRef.current += 1;
     if (utteranceRef.current) {
       utteranceRef.current.onend = null;
@@ -197,6 +201,10 @@ export function ReaderPage() {
   /** 播放/暂停切换 */
   const handlePlayPause = () => {
     if (isPlaying) {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
       ttsGenerationRef.current += 1;
       if (utteranceRef.current) {
         utteranceRef.current.onend = null;
@@ -210,6 +218,10 @@ export function ReaderPage() {
 
   /** 跳转到下一句 */
   const handleNext = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
     ttsGenerationRef.current += 1;
     if (utteranceRef.current) {
       utteranceRef.current.onend = null;
@@ -224,6 +236,10 @@ export function ReaderPage() {
   };
 
   const handlePrev = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
     ttsGenerationRef.current += 1;
     if (utteranceRef.current) {
       utteranceRef.current.onend = null;
@@ -252,6 +268,10 @@ export function ReaderPage() {
   /** 拖拽开始事件处理 */
   const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     wasPlayingBeforeDragRef.current = isPlaying;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
     ttsGenerationRef.current += 1;
     if (utteranceRef.current) {
       utteranceRef.current.onend = null;
