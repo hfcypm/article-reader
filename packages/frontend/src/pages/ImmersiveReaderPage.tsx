@@ -138,11 +138,11 @@ export function ImmersiveReaderPage() {
     if (res.success && res.data) {
       setDoc(res.data);
 
-      const shelfRes = await api.get<{ currentSentence: number }[]>(
-        `/bookshelf?search=${encodeURIComponent(res.data.title)}`
+      const shelfRes = await api.get<{ currentSentence: number }>(
+        `/bookshelf/by-doc/${id}`
       );
-      if (shelfRes.success && shelfRes.data && shelfRes.data.length > 0) {
-        const savedSentence = shelfRes.data[0].currentSentence || 0;
+      if (shelfRes.success && shelfRes.data) {
+        const savedSentence = shelfRes.data.currentSentence || 0;
         const sentences = ((res.data.sentences as unknown[]) || []) as { text: string; index: number }[];
         const height = contentRef.current?.clientHeight || 600;
         const pages = paginateSentences(sentences, height, fontSize);

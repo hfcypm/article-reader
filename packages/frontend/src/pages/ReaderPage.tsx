@@ -91,9 +91,9 @@ export function ReaderPage() {
     const res = await api.get<Document>(`/documents/${id}`);
     if (res.success && res.data) {
       setDoc(res.data);
-      const shelfRes = await api.get<{ currentSentence: number }[]>(`/bookshelf?search=${encodeURIComponent(res.data.title)}`);
-      if (shelfRes.success && shelfRes.data && shelfRes.data.length > 0) {
-        setCurrentIndex(shelfRes.data[0].currentSentence || 0);
+      const shelfRes = await api.get<{ currentSentence: number }>(`/bookshelf/by-doc/${id}`);
+      if (shelfRes.success && shelfRes.data) {
+        setCurrentIndex(shelfRes.data.currentSentence || 0);
       }
     }
     setLoading(false);
@@ -178,6 +178,7 @@ export function ReaderPage() {
   const handlePlayPause = () => {
     if (isPlaying) {
       window.speechSynthesis?.cancel();
+      saveProgress();
     }
     setIsPlaying(!isPlaying);
   };

@@ -13,11 +13,12 @@ import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/dialog';
+import { ProgressBar } from '@/components/ui/progress-bar';
 import { showToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { formatDate, SPEED_OPTIONS, type SpeedOption } from '@/lib/utils';
 import { useSettingsStore } from '@/store/settingsStore';
-import type { Document } from '@/types';
+import type { Document, BookshelfItem } from '@/types';
 
 // 文档信息统计卡片配置：key、展示标签、图标名、颜色主题
 const STAT_CONFIG = [
@@ -52,6 +53,8 @@ export function DetailPage() {
   const [loading, setLoading] = useState(true);
   // 是否已加入书架
   const [inBookshelf, setInBookshelf] = useState(false);
+  // 书架条目（含阅读进度）
+  const [shelfItem, setShelfItem] = useState<BookshelfItem | null>(null);
   // 是否显示"加入书架"提示弹窗
   const [showPrompt, setShowPrompt] = useState(false);
   // 编辑书名时输入的标题
@@ -82,9 +85,10 @@ export function DetailPage() {
       setDoc(res.data);
       setEditTitle(res.data.title);
 
-      const shelfRes = await api.get(`/bookshelf?search=${encodeURIComponent(res.data.title)}`);
-      if (shelfRes.success && shelfRes.data && Array.isArray(shelfRes.data) && shelfRes.data.length > 0) {
+      const shelfRes = await api.get<BookshelfItem>(`/bookshelf/by-doc/${id}`);
+      if (shelfRes.success && shelfRes.data) {
         setInBookshelf(true);
+        setShelfItem(shelfRes.data);
       } else {
         setShowPrompt(true);
       }
@@ -98,6 +102,10 @@ export function DetailPage() {
     const res = await api.post('/bookshelf', { docId });
     if (res.success) {
       setInBookshelf(true);
+      const shelfRes = await api.get<BookshelfItem>(`/bookshelf/by-doc/${docId}`);
+      if (shelfRes.success && shelfRes.data) {
+        setShelfItem(shelfRes.data);
+      }
       showToast('已加入书架', 'success');
       setShowPrompt(false);
     }
@@ -231,10 +239,31 @@ export function DetailPage() {
           </div>
 
           <div className="mb-6">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-1 h-4 rounded-full bg-primary" />
-              <h2 className="text-sm font-semibold text-text">正文预览</h2>
-            </div>
+            {shelfItem && shelfItem.progress > 0 ? (
+              <div className="rounded-2xl bg-surface-card border border-border/40 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1 h-4 rounded-full bg-emerald-500" />
+                    <h2 className="text-sm font-semibold text-text">阅读进度</h2>
+                  </div>
+                  <span className="text-xs text-text-muted">
+                    第 {shelfItem.currentSentence} / {shelfItem.sentenceCount} 句
+                  </span>
+                </div>
+                <ProgressBar progress={shelfItem.progress} size="sm" showLabel />
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-1 h-4 rounded-full bg-primary" />
+                <h2 className="text-sm font-semibold text-text">正文预览</h2>
+              </div>
+            )}
+            {shelfItem && shelfItem.progress > 0 && (
+              <div className="flex items-center gap-2 mt-4 mb-4">
+                <div className="w-1 h-4 rounded-full bg-primary" />
+                <h2 className="text-sm font-semibold text-text">正文预览</h2>
+              </div>
+            )}
             <div className="relative rounded-2xl bg-surface-card border border-border/40 overflow-hidden">
               <div className={`p-4 overflow-y-auto ${previewExpanded ? 'max-h-96' : 'max-h-52'}`}>
                 <p className="text-sm text-text/80 leading-7 whitespace-pre-wrap selection:bg-primary/20">

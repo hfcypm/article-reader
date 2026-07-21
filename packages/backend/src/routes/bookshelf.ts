@@ -63,6 +63,26 @@ export const bookshelfRoutes = new Elysia({ prefix: '/api/bookshelf' })
   })
 
   /**
+   * 根据文档 ID 获取书架条目
+   * GET /api/bookshelf/by-doc/:docId
+   * 用于恢复阅读进度等场景
+   */
+  .get('/by-doc/:docId', async ({ params, userId, set }) => {
+    try {
+      const item = await bookshelfService.getByDocId(userId, params.docId);
+      if (!item) {
+        set.status = 404;
+        return error('文档未在书架中');
+      }
+      return success(item);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : '查询失败';
+      set.status = 400;
+      return error(message);
+    }
+  })
+
+  /**
    * 更新阅读进度
    * PUT /api/bookshelf/:docId/progress
    * 保存用户对指定文档的阅读进度（当前句子索引）

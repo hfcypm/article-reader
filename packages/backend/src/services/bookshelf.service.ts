@@ -131,6 +131,41 @@ export class BookshelfService {
   }
 
   /**
+   * 根据文档 ID 获取书架条目
+   * 用于恢复阅读进度等场景，返回扁平化的条目信息
+   */
+  async getByDocId(userId: string, docId: string) {
+    const item = await prisma.bookshelfItem.findUnique({
+      where: { userId_docId: { userId, docId } },
+      include: {
+        document: {
+          select: {
+            id: true,
+            title: true,
+            format: true,
+            wordCount: true,
+            importedAt: true,
+            sentences: true,
+          },
+        },
+      },
+    });
+    if (!item) return null;
+    return {
+      id: item.id,
+      docId: item.docId,
+      title: item.document.title,
+      format: item.document.format,
+      wordCount: item.document.wordCount,
+      currentSentence: item.currentSentence,
+      progress: item.progress,
+      addedAt: item.addedAt,
+      lastReadAt: item.lastReadAt,
+      sentenceCount: JSON.parse(item.document.sentences).length,
+    };
+  }
+
+  /**
    * 从书架移除文档
    * 校验书架条目属于当前用户后才执行删除
    */
